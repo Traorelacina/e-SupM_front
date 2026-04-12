@@ -63,7 +63,6 @@ async function request<T = any>(
 }
 
 const get = <T = any>(path: string, params: Record<string, any> = {}): Promise<T> => {
-  // Filtrer les valeurs undefined/null/vides
   const filtered = Object.fromEntries(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
   );
@@ -83,6 +82,31 @@ const patch = <T = any>(path: string, body: any): Promise<T> =>
   request<T>('PATCH', path, body);
 
 // ─── Types ──────────────────────────────────────────────────────────────────
+
+export interface ProductCategory {
+  id: number;
+  category_id: number;
+  category?: Pick<Category, 'id' | 'name' | 'color'>;
+  name: string;
+  name_en?: string;
+  slug: string;
+  description?: string;
+  image?: string;
+  image_url?: string;
+  color: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GroupedProductCategories {
+  id: number;
+  name: string;
+  color?: string;
+  product_categories: ProductCategory[];
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -96,6 +120,8 @@ export interface Product {
   barcode?: string;
   category_id: number;
   category?: Category;
+  product_category_id?: number | null;
+  product_category?: ProductCategory;
   images?: ProductImage[];
   primary_image?: ProductImage;
   is_active: boolean;
@@ -137,6 +163,7 @@ export interface Category {
   image?: string;
   image_url?: string;
   children?: Category[];
+  product_categories?: ProductCategory[];
 }
 
 export interface PaginatedResponse<T> {
@@ -206,8 +233,7 @@ export const categoryApi = {
     get<PaginatedResponse<Product>>(`/categories/${slug}/products`, params),
 };
 
-// ─── Categories API (admin) ─────────────────────────────────────────────────
-
+// ─── Categories API (admin — Rayons) ────────────────────────────────────────
 export const categoriesApi = {
   list: () => get<Category[]>('/admin/categories'),
   tree: () => get<Category[]>('/admin/categories/tree'),
@@ -221,6 +247,61 @@ export const categoriesApi = {
   toggle: (id: number) => post(`/admin/categories/${id}/toggle`),
   reorder: (id: number, sortOrder: number) =>
     put(`/admin/categories/${id}/reorder`, { sort_order: sortOrder }),
+};
+
+// ─── Product Categories API (admin — Catégories de produits) ────────────────
+export const productCategoriesApi = {
+  /** Toutes les catégories, optionnellement filtrées par rayon */
+  list: (params?: { category_id?: number; active?: boolean; q?: string }) =>
+    get<{ success: boolean; data: ProductCategory[] }>(
+      '/admin/product-categories',
+      params as any
+    ),
+
+  /** Catégories groupées par rayon — pour les selects et le manager */
+  grouped: () =>
+    get<{ success: boolean; data: GroupedProductCategories[] }>(
+      '/admin/product-categories/grouped'
+    ),
+
+  /** Catégories d'un rayon spécifique */
+  byRayon: (categoryId: number) =>
+    get<{ success: boolean; data: ProductCategory[]; rayon: { id: number; name: string } }>(
+      `/admin/product-categories/by-rayon/${categoryId}`
+    ),
+
+  get: (id: number) =>
+    get<{ success: boolean; data: ProductCategory }>(`/admin/product-categories/${id}`),
+
+  create: (formData: FormData) =>
+    post<{ success: boolean; message: string; data: ProductCategory }>(
+      '/admin/product-categories',
+      formData,
+      true
+    ),
+
+  update: (id: number, formData: FormData) => {
+    formData.append('_method', 'PUT');
+    return post<{ success: boolean; message: string; data: ProductCategory }>(
+      `/admin/product-categories/${id}`,
+      formData,
+      true
+    );
+  },
+
+  delete: (id: number) =>
+    del<{ success: boolean; message: string }>(`/admin/product-categories/${id}`),
+
+  toggle: (id: number) =>
+    post<{ success: boolean; is_active: boolean; message: string }>(
+      `/admin/product-categories/${id}/toggle`
+    ),
+
+  reorder: (items: { id: number; sort_order: number }[]) =>
+    post<{ success: boolean; message: string }>(
+      '/admin/product-categories/reorder',
+      { items }
+    ),
 };
 
 // ─── Products API (public) ──────────────────────────────────────────────────
@@ -274,6 +355,7 @@ export const adminApi = {
   alerts: () => get('/admin/dashboard/alerts'),
   products: productsApi,
   categories: categoriesApi,
+  productCategories: productCategoriesApi,
   orders: {
     list: (params?: Record<string, any>) => get('/admin/orders', params),
     get: (id: number) => get(`/admin/orders/${id}`),
@@ -474,6 +556,7 @@ export default {
   addressApi,
   categoryApi,
   categoriesApi,
+  productCategoriesApi,
   productApi,
   productsApi,
   adminApi,

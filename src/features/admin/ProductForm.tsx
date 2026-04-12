@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   X,
   Check,
@@ -34,12 +34,19 @@ import {
   Save,
   AlertCircle,
 } from 'lucide-react';
-import { adminApi, storageUrl } from '@/api';
+import { adminApi, categoriesApi, storageUrl } from '@/api';
 import type { Product, Category } from '@/api';
 
 // ── Types ──────────────────────────────────────────────────────────
 interface FlatCategory extends Category {
   _depth: number;
+}
+
+interface ProductCategory {
+  id: number;
+  name: string;
+  color?: string;
+  description?: string;
 }
 
 interface Props {
@@ -75,6 +82,7 @@ const ATTRS: { key: string; label: string; icon: React.ElementType }[] = [
 
 const EMPTY_FORM: Record<string, any> = {
   category_id: '',
+  product_category_id: '',
   name: '',
   description: '',
   price: '',
@@ -107,9 +115,7 @@ const EMPTY_FORM: Record<string, any> = {
 // ── Helper pour l'URL des images produit ──────────────────────────
 function getProductImageUrl(img: any): string {
   if (!img) return '';
-  // Si l'API retourne directement une URL complète
   if (img.url && (img.url.startsWith('http') || img.url.startsWith('/'))) return img.url;
-  // Sinon construire depuis le path
   if (img.path) return storageUrl(img.path) ?? '';
   return '';
 }
@@ -160,6 +166,46 @@ export default function ProductForm({
   const [saving, setSaving] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // ── Product categories state ──────────────────────────────────
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
+  const [loadingProdCats, setLoadingProdCats] = useState(false);
+
+  // Charge les catégories de produits quand le rayon change
+  useEffect(() => {
+    const catId = form.category_id;
+    if (!catId) {
+      setProductCategories([]);
+      setForm((f) => ({ ...f, product_category_id: '' }));
+      return;
+    }
+
+    const loadProductCategories = async () => {
+      setLoadingProdCats(true);
+      try {
+        // On récupère le rayon depuis l'arbre déjà chargé dans categories
+        // ou on appelle l'API show pour avoir les product_categories
+        const res = await categoriesApi.get(Number(catId));
+        const cat = res as any;
+        const pcs: ProductCategory[] = cat?.product_categories ?? [];
+        setProductCategories(pcs);
+
+        // Si la catégorie produit actuelle n'appartient pas à ce rayon, reset
+        if (form.product_category_id) {
+          const stillValid = pcs.some((pc) => pc.id === Number(form.product_category_id));
+          if (!stillValid) {
+            setForm((f) => ({ ...f, product_category_id: '' }));
+          }
+        }
+      } catch {
+        setProductCategories([]);
+      } finally {
+        setLoadingProdCats(false);
+      }
+    };
+
+    loadProductCategories();
+  }, [form.category_id]);
 
   const set = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -213,7 +259,6 @@ export default function ProductForm({
   const handleSubmit = async (isDraft = false) => {
     if (!validate()) {
       onToast('Corrigez les erreurs avant de continuer', 'error');
-      // Aller au premier onglet si l'erreur est là
       if (errors.category_id || errors.name) setTab(0);
       else if (errors.price || errors.stock) setTab(1);
       return;
@@ -231,10 +276,7 @@ export default function ProductForm({
       }
 
       if (product?.id) {
-        // Mise à jour — on envoie en JSON (pas de fichier)
         await adminApi.products.update(product.id, submitData);
-
-        // Upload nouvelles images séparément
         if (newImages.length) {
           const imgFd = new FormData();
           newImages.forEach((img) => imgFd.append('images[]', img));
@@ -242,7 +284,6 @@ export default function ProductForm({
         }
         onToast(isDraft ? 'Brouillon mis à jour' : 'Produit mis à jour');
       } else {
-        // Création — FormData pour inclure les images
         const fd = new FormData();
         Object.entries(submitData).forEach(([k, v]) => {
           if (v === null || v === undefined || v === '') return;
@@ -327,7 +368,7 @@ export default function ProductForm({
           </button>
         </div>
 
-        {/* Tabs — scrollables horizontalement sur mobile */}
+        {/* Tabs */}
         <div className="flex border-b border-stone-100 px-4 sm:px-6 flex-shrink-0 overflow-x-auto scrollbar-none">
           {TABS.map((t, i) => (
             <button
@@ -345,7 +386,6 @@ export default function ProductForm({
                   {totalImages}
                 </span>
               )}
-              {/* Indicateur d'erreur */}
               {((i === 0 && (errors.category_id || errors.name)) ||
                 (i === 1 && (errors.price || errors.stock))) && (
                 <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
@@ -362,14 +402,16 @@ export default function ProductForm({
           </div>
         )}
 
-        {/* Body — scrollable */}
+        {/* Body */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 overscroll-contain">
+
           {/* ── Tab 0 : Général ── */}
           {tab === 0 && (
             <div className="space-y-4">
+              {/* Rayon + Statut */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div className="sm:col-span-2">
-                  <Field label="Catégorie" required error={errors.category_id}>
+                  <Field label="Rayon" required error={errors.category_id}>
                     <select
                       value={form.category_id}
                       onChange={(e) => set('category_id', e.target.value)}
@@ -414,6 +456,61 @@ export default function ProductForm({
                 </div>
               </div>
 
+              {/* Catégorie de produit — s'affiche uniquement si un rayon est sélectionné */}
+              {form.category_id && (
+                <Field label="Catégorie de produit">
+                  <div className="relative">
+                    <select
+                      value={form.product_category_id ?? ''}
+                      onChange={(e) => set('product_category_id', e.target.value || '')}
+                      disabled={loadingProdCats}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-300 bg-white transition-all disabled:opacity-60"
+                    >
+                      <option value="">— Aucune catégorie —</option>
+                      {productCategories.map((pc) => (
+                        <option key={pc.id} value={pc.id}>
+                          {pc.name}
+                        </option>
+                      ))}
+                    </select>
+                    {loadingProdCats && (
+                      <RefreshCw
+                        size={14}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 animate-spin pointer-events-none"
+                      />
+                    )}
+                  </div>
+                  {!loadingProdCats && productCategories.length === 0 && (
+                    <p className="text-xs text-stone-400 mt-1">
+                      Ce rayon n'a pas de catégories de produits
+                    </p>
+                  )}
+                  {!loadingProdCats && productCategories.length > 0 && form.product_category_id && (
+                    <div className="mt-1.5">
+                      {productCategories
+                        .filter((pc) => pc.id === Number(form.product_category_id))
+                        .map((pc) => (
+                          <span
+                            key={pc.id}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                            style={{
+                              backgroundColor: pc.color ? `${pc.color}20` : '#fef3c7',
+                              color: pc.color || '#92400e',
+                              border: `1px solid ${pc.color || '#fbbf24'}`,
+                            }}
+                          >
+                            <div
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: pc.color || '#fbbf24' }}
+                            />
+                            {pc.name}
+                          </span>
+                        ))}
+                    </div>
+                  )}
+                </Field>
+              )}
+
               <InputField
                 label="Nom du produit"
                 k="name"
@@ -448,9 +545,7 @@ export default function ProductForm({
           {/* ── Tab 1 : Prix & Stock ── */}
           {tab === 1 && (
             <div className="space-y-5">
-              {/* Cards prix */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Prix vente */}
                 <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-amber-600 mb-2 flex items-center gap-1">
                     <Tag size={12} /> Prix de vente
@@ -475,7 +570,6 @@ export default function ProductForm({
                   )}
                 </div>
 
-                {/* Prix barré */}
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-2 flex items-center gap-1">
                     <Percent size={12} /> Prix barré
@@ -499,7 +593,6 @@ export default function ProductForm({
                   )}
                 </div>
 
-                {/* Prix de revient */}
                 <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-2 flex items-center gap-1">
                     <DollarSign size={12} /> Prix de revient
@@ -560,7 +653,6 @@ export default function ProductForm({
                 />
               </div>
 
-              {/* Indicateur stock */}
               {form.stock !== '' && form.stock !== undefined && (
                 <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -646,7 +738,6 @@ export default function ProductForm({
           {/* ── Tab 3 : Images ── */}
           {tab === 3 && (
             <div className="space-y-5">
-              {/* Images existantes */}
               {existingImgs.length > 0 && (
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 flex items-center gap-2">
@@ -695,7 +786,6 @@ export default function ProductForm({
                 </div>
               )}
 
-              {/* Drop zone */}
               <div
                 className="border-2 border-dashed border-stone-300 rounded-2xl p-6 sm:p-8 text-center cursor-pointer hover:border-amber-400 hover:bg-amber-50/30 transition-all"
                 onClick={() => fileRef.current?.click()}
@@ -730,7 +820,6 @@ export default function ProductForm({
                 </p>
               </div>
 
-              {/* Nouvelles images */}
               {newPreviews.length > 0 && (
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3">
