@@ -2,116 +2,238 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, ShoppingCart, Star, ChevronRight, ChevronLeft,
-  Megaphone, Leaf, Beef, Croissant, Wine, Baby, Sparkles,
-  Waves, Heart, Package, Repeat, Tag, Truck, Trophy,
-  UtensilsCrossed, FlaskConical, Apple, ShoppingBag,
-  Gamepad2, Gift, Zap, RefreshCw, BookOpen, Users,
-  Lightbulb, MessageSquare, Monitor,
+  Megaphone, Leaf, Zap, Heart, Package, Repeat, Tag, Truck, Trophy,
+  UtensilsCrossed, Apple, ShoppingBag, Gamepad2, Gift, RefreshCw,
+  BookOpen, Users, Lightbulb, MessageSquare, Monitor, Sparkles,
+  Search, MapPin, Clock, TrendingUp, Award, Flame,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { categoryApi, productApi, advertisementApi } from '@/api'
+import { storageUrl } from '@/api'
 import { useCart } from '@/hooks/useCart'
 import { formatCurrency } from '@/lib/utils'
 import { ProductCardSkeleton } from '@/components/ui/Skeleton'
 import { useNormalizedProducts } from '@/hooks/useNormalizedProducts'
 import type { Product } from '@/types'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 // ─────────────────────────────────────────────────────────────
-// ICÔNES PAR SLUG DE CATÉGORIE
+// DESIGN TOKENS & GLOBAL STYLES
 // ─────────────────────────────────────────────────────────────
-const RAYON_ICONS: Record<string, React.ReactNode> = {
-  'produits-frais':           <Apple className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'epicerie-salee':           <UtensilsCrossed className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'epicerie-sucree':          <Sparkles className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'espace-soif':              <Wine className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'boucherie-poissonnerie':   <Beef className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'pain-patisserie':          <Croissant className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'rayon-premium':            <Star className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'bebe-confort':             <Baby className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'hygiene-beaute':           <Leaf className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'dietetique-sante':         <FlaskConical className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'entretien-menage':         <Waves className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'non-alimentaire':          <ShoppingBag className="h-5 w-5 sm:h-6 sm:w-6" />,
-  'demi-gros':                <Package className="h-5 w-5 sm:h-6 sm:w-6" />,
-}
+const GLOBAL_STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600;700&display=swap');
 
-const RAYON_COLORS = [
-  'bg-green-100 text-green-700 border-green-300',
-  'bg-orange-100 text-orange-700 border-orange-300',
-  'bg-pink-100 text-pink-700 border-pink-300',
-  'bg-blue-100 text-blue-700 border-blue-300',
-  'bg-red-100 text-red-700 border-red-300',
-  'bg-yellow-100 text-yellow-700 border-yellow-300',
-  'bg-purple-100 text-purple-700 border-purple-300',
-  'bg-teal-100 text-teal-700 border-teal-300',
-  'bg-amber-100 text-amber-700 border-amber-300',
-  'bg-rose-100 text-rose-700 border-rose-300',
-  'bg-cyan-100 text-cyan-700 border-cyan-300',
-  'bg-indigo-100 text-indigo-700 border-indigo-300',
-  'bg-lime-100 text-lime-700 border-lime-300',
-]
+  :root {
+    --esup-cream: #faf7f2;
+    --esup-warm: #f5efe6;
+    --esup-amber: #e8820c;
+    --esup-amber-light: #f5a623;
+    --esup-earth: #8b5e3c;
+    --esup-dark: #1a1209;
+    --esup-olive: #4a5e2e;
+    --esup-sage: #6b7c4a;
+    --esup-carton: #c49a51;
+    --esup-carton-dark: #8b5a2b;
+    --esup-carton-light: #e8c06a;
+    --radius-card: 14px;
+  }
+
+  .esup-font-display { font-family: 'Playfair Display', Georgia, serif; }
+  .esup-font-body { font-family: 'DM Sans', system-ui, sans-serif; }
+
+  /* Grain texture overlay */
+  .esup-grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.35;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  /* Cardboard box styles */
+  @keyframes boxSlideIn {
+    0% { opacity: 0; transform: translateY(30px) scale(0.9); }
+    60% { transform: translateY(-5px) scale(1.02); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .carton-box {
+    animation: boxSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    cursor: pointer;
+    position: relative;
+  }
+  .carton-box:nth-child(1) { animation-delay: 0.05s; }
+  .carton-box:nth-child(2) { animation-delay: 0.1s; }
+  .carton-box:nth-child(3) { animation-delay: 0.15s; }
+  .carton-box:nth-child(4) { animation-delay: 0.2s; }
+  .carton-box:nth-child(5) { animation-delay: 0.25s; }
+  .carton-box:nth-child(6) { animation-delay: 0.3s; }
+  .carton-box:nth-child(7) { animation-delay: 0.35s; }
+  .carton-box:nth-child(8) { animation-delay: 0.4s; }
+  .carton-box:nth-child(9) { animation-delay: 0.45s; }
+
+  .carton-face {
+    background:
+      repeating-linear-gradient(
+        92deg,
+        transparent 0px,
+        transparent 3px,
+        rgba(0,0,0,0.025) 3px,
+        rgba(0,0,0,0.025) 4px
+      ),
+      repeating-linear-gradient(
+        2deg,
+        transparent 0px,
+        transparent 8px,
+        rgba(255,255,255,0.04) 8px,
+        rgba(255,255,255,0.04) 9px
+      ),
+      linear-gradient(160deg, #d4a04a 0%, #b5783a 35%, #c49a51 65%, #8b5a2b 100%);
+    border: 1.5px solid rgba(255,255,255,0.22);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.3),
+      inset 0 -2px 4px rgba(0,0,0,0.2),
+      0 4px 12px rgba(0,0,0,0.18),
+      0 1px 3px rgba(0,0,0,0.12);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .carton-box:hover .carton-face {
+    transform: translateY(-5px) rotateX(-5deg) rotateY(3deg);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.35),
+      inset 0 -2px 4px rgba(0,0,0,0.2),
+      0 14px 28px rgba(0,0,0,0.22),
+      0 4px 8px rgba(0,0,0,0.15);
+    background:
+      repeating-linear-gradient(
+        92deg,
+        transparent 0px,
+        transparent 3px,
+        rgba(0,0,0,0.02) 3px,
+        rgba(0,0,0,0.02) 4px
+      ),
+      linear-gradient(160deg, #e8b855 0%, #c98a45 35%, #daa855 65%, #a06832 100%);
+  }
+
+  .carton-flap {
+    background: linear-gradient(180deg, #dfaa50 0%, #c08535 60%, #b07030 100%);
+    border-bottom: 2px solid rgba(0,0,0,0.15);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  }
+
+  .carton-shadow-3d {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    left: 4px;
+    top: 4px;
+    background: rgba(0,0,0,0.25);
+    border-radius: var(--radius-card);
+    z-index: -1;
+    transition: all 0.3s ease;
+  }
+  .carton-box:hover .carton-shadow-3d {
+    bottom: -8px;
+    right: -6px;
+  }
+
+  /* Horizontal scroll hide scrollbar */
+  .hide-scroll::-webkit-scrollbar { display: none; }
+  .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Section title underline */
+  .section-title-line {
+    display: inline-block;
+    position: relative;
+  }
+  .section-title-line::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 40%;
+    height: 3px;
+    background: var(--esup-amber);
+    border-radius: 2px;
+  }
+
+  /* Product card hover */
+  .product-card:hover .product-img {
+    transform: scale(1.07);
+  }
+
+  /* Ad slot pulse */
+  @keyframes adPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  .ad-placeholder-icon { animation: adPulse 2.5s ease-in-out infinite; }
+`
 
 // ─────────────────────────────────────────────────────────────
-// AD SLOT
+// AD SLOT — refined version
 // ─────────────────────────────────────────────────────────────
 interface AdSlotProps {
   ads?: { id: number; image_url: string; link?: string; title?: string }[]
   side: 'left' | 'right'
   minHeight?: number
+  className?: string
 }
 
-function AdSlot({ ads, side, minHeight = 300 }: AdSlotProps) {
+function AdSlot({ ads, side, minHeight = 300, className = '' }: AdSlotProps) {
   const [current, setCurrent] = useState(0)
   const count = ads?.length ?? 0
 
   useEffect(() => {
     if (count < 2) return
-    const t = setInterval(() => setCurrent(c => (c + 1) % count), 4000)
+    const t = setInterval(() => setCurrent(c => (c + 1) % count), 4500)
     return () => clearInterval(t)
   }, [count])
 
   const placeholder = (
-    <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-stone-100 to-stone-200 rounded-xl border-2 border-dashed border-stone-300">
-      <Megaphone className="h-7 w-7 text-stone-400" />
-      <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest text-center px-2">
-        Espace Publicité
-      </span>
-      <div className="flex gap-1.5">
-        <div className="w-1.5 h-1.5 rounded-full bg-stone-400" />
-        <div className="w-1.5 h-1.5 rounded-full bg-stone-300" />
+    <div className="w-full h-full flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed"
+      style={{ background: 'rgba(139,94,60,0.06)', borderColor: 'rgba(139,94,60,0.2)' }}>
+      <div className="ad-placeholder-icon w-10 h-10 rounded-xl flex items-center justify-center"
+        style={{ background: 'rgba(139,94,60,0.1)' }}>
+        <Megaphone className="h-5 w-5" style={{ color: 'var(--esup-earth)' }} />
       </div>
+      <span className="text-[9px] font-bold uppercase tracking-widest text-center px-2"
+        style={{ color: 'var(--esup-earth)', opacity: 0.5 }}>
+        Espace Pub
+      </span>
     </div>
   )
 
   return (
-    <div className="relative w-full h-full overflow-hidden rounded-xl shadow-md" style={{ minHeight }}>
+    <div className={`relative w-full h-full overflow-hidden rounded-2xl ${className}`} style={{ minHeight }}>
       {!ads || ads.length === 0 ? placeholder : (
         <>
           <AnimatePresence mode="wait">
-            <motion.div
-              key={current}
-              initial={{ opacity: 0, y: side === 'left' ? 20 : -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: side === 'left' ? -20 : 20 }}
-              transition={{ duration: 0.5 }}
-              className="absolute inset-0"
-            >
+            <motion.div key={current}
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.6 }}
+              className="absolute inset-0">
               {ads[current].link ? (
                 <a href={ads[current].link} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
-                  <img src={ads[current].image_url} alt={ads[current].title ?? 'Publicité'} className="w-full h-full object-cover rounded-xl" />
+                  <img src={ads[current].image_url} alt={ads[current].title ?? 'Publicité'}
+                    className="w-full h-full object-cover rounded-2xl" />
                 </a>
               ) : (
-                <img src={ads[current].image_url} alt={ads[current].title ?? 'Publicité'} className="w-full h-full object-cover rounded-xl" />
+                <img src={ads[current].image_url} alt={ads[current].title ?? 'Publicité'}
+                  className="w-full h-full object-cover rounded-2xl" />
               )}
             </motion.div>
           </AnimatePresence>
           {count > 1 && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+            <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
               {ads.map((_, i) => (
                 <button key={i} onClick={() => setCurrent(i)}
-                  className={`rounded-full transition-all duration-300 ${i === current ? 'w-4 h-1.5 bg-white' : 'w-1.5 h-1.5 bg-white/50'}`}
-                />
+                  className={`rounded-full transition-all duration-300 ${i === current ? 'w-5 h-1.5 bg-white' : 'w-1.5 h-1.5 bg-white/50'}`} />
               ))}
             </div>
           )}
@@ -122,97 +244,119 @@ function AdSlot({ ads, side, minHeight = 300 }: AdSlotProps) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// HERO SLIDER (composant partagé mobile + desktop)
+// HERO SLIDER — editorial, warm
 // ─────────────────────────────────────────────────────────────
 const SLIDES = [
   {
     tag: 'Ventes Flash',
-    title: 'Faites vos courses en ligne',
+    title: 'Faites vos courses\nen ligne',
     sub: 'Livraison à domicile en 24h à Abidjan. Plus de 5 000 produits disponibles.',
     cta: 'Découvrir le catalogue',
     href: '/catalogue',
-    bg: 'from-amber-500 via-orange-500 to-red-500',
-    icon: <ShoppingCart className="h-16 w-16 sm:h-20 sm:w-20 text-white/30" />,
+    palette: { from: '#c0530a', via: '#e8820c', to: '#f5a623', tag: '#fff3cd' },
+    Icon: ShoppingCart,
+    accent: TrendingUp,
   },
   {
     tag: 'Jeux & Gains',
-    title: 'Gagnez des lots chaque semaine',
-    sub: 'Quiz, Roue, Carte à gratter — des surprises à chaque achat !',
+    title: 'Gagnez des lots\nchaque semaine',
+    sub: 'Quiz, Roue, Carte à gratter — des surprises à chaque achat.',
     cta: 'Jouer maintenant',
     href: '/games',
-    bg: 'from-purple-600 via-fuchsia-500 to-pink-500',
-    icon: <Gamepad2 className="h-16 w-16 sm:h-20 sm:w-20 text-white/30" />,
+    palette: { from: '#4c1d95', via: '#7c3aed', to: '#a855f7', tag: '#f3e8ff' },
+    Icon: Gamepad2,
+    accent: Sparkles,
   },
   {
     tag: 'Charity Panier',
-    title: 'Faites le bien en faisant vos courses',
+    title: 'Faites le bien\nen faisant vos courses',
     sub: 'Offrez des bons alimentaires et gagnez des points fidélité.',
     cta: 'Faire un don',
     href: '/charity',
-    bg: 'from-green-600 via-emerald-500 to-teal-400',
-    icon: <Heart className="h-16 w-16 sm:h-20 sm:w-20 text-white/30" />,
+    palette: { from: '#064e3b', via: '#059669', to: '#34d399', tag: '#d1fae5' },
+    Icon: Heart,
+    accent: Leaf,
   },
 ]
 
 function HeroSlider() {
   const navigate = useNavigate()
   const [current, setCurrent] = useState(0)
+  const [direction, setDirection] = useState(1)
+
+  const go = (idx: number) => {
+    setDirection(idx > current ? 1 : -1)
+    setCurrent(idx)
+  }
 
   useEffect(() => {
-    const t = setInterval(() => setCurrent(c => (c + 1) % SLIDES.length), 5000)
+    const t = setInterval(() => {
+      setDirection(1)
+      setCurrent(c => (c + 1) % SLIDES.length)
+    }, 5500)
     return () => clearInterval(t)
   }, [])
 
   const slide = SLIDES[current]
+  const { from, via, to } = slide.palette
 
   return (
-    <div className="relative overflow-hidden rounded-2xl shadow-lg min-h-[200px] sm:min-h-[340px] h-full">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={current}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.6 }}
-          className={`absolute inset-0 bg-gradient-to-br ${slide.bg}`}
-        >
-          <div className="absolute inset-0 bg-black/10" />
-          <div className="absolute -top-10 -right-10 w-40 h-40 sm:w-56 sm:h-56 rounded-full bg-white/10 blur-2xl" />
-          <div className="absolute -bottom-10 -left-10 w-40 h-40 sm:w-56 sm:h-56 rounded-full bg-white/10 blur-2xl" />
-          <div className="absolute right-6 top-1/2 -translate-y-1/2 hidden sm:block">{slide.icon}</div>
-          <div className="relative z-10 h-full flex flex-col justify-center px-5 sm:px-8 py-6 sm:py-10 max-w-lg">
+    <div className="relative overflow-hidden rounded-2xl shadow-xl h-full" style={{ minHeight: 220 }}>
+      <AnimatePresence mode="wait" custom={direction}>
+        <motion.div key={current}
+          custom={direction}
+          initial={{ opacity: 0, x: direction * 60 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: direction * -60 }}
+          transition={{ duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="absolute inset-0 esup-grain"
+          style={{ background: `linear-gradient(145deg, ${from} 0%, ${via} 55%, ${to} 100%)` }}>
+
+          {/* Decorative circles */}
+          <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full opacity-15"
+            style={{ background: 'radial-gradient(circle, white 0%, transparent 70%)' }} />
+          <div className="absolute -bottom-16 -left-8 w-56 h-56 rounded-full opacity-10"
+            style={{ background: 'radial-gradient(circle, white 0%, transparent 70%)' }} />
+
+          {/* Large icon */}
+          <div className="absolute right-6 top-1/2 -translate-y-1/2 hidden sm:flex items-center justify-center w-24 h-24 rounded-3xl"
+            style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}>
+            <slide.Icon className="h-12 w-12 text-white" strokeWidth={1.5} />
+          </div>
+
+          <div className="relative z-10 h-full flex flex-col justify-center px-6 sm:px-8 py-7 sm:py-10 max-w-md">
             <motion.span
-              initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}
-              className="inline-flex items-center gap-1.5 bg-white/20 text-white text-[10px] sm:text-xs font-bold uppercase tracking-widest px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full w-fit mb-2 sm:mb-4"
-            >
-              <Zap className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{slide.tag}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
+              className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full w-fit mb-3"
+              style={{ background: slide.palette.tag, color: from }}>
+              <slide.accent className="h-3 w-3" />
+              {slide.tag}
             </motion.span>
+
             <motion.h1
-              initial={{ y: 15, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}
-              className="text-xl sm:text-3xl md:text-4xl font-black text-white leading-tight"
-            >
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+              className="esup-font-display text-white leading-tight font-black"
+              style={{ fontSize: 'clamp(22px, 4vw, 38px)', whiteSpace: 'pre-line' }}>
               {slide.title}
             </motion.h1>
+
             <motion.p
-              initial={{ y: 15, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}
-              className="mt-2 sm:mt-3 text-white/90 text-xs sm:text-sm leading-relaxed line-clamp-2 sm:line-clamp-none"
-            >
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}
+              className="esup-font-body mt-2 text-white/85 text-sm leading-relaxed line-clamp-2 sm:line-clamp-none">
               {slide.sub}
             </motion.p>
+
             <motion.div
-              initial={{ y: 15, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }}
-              className="mt-3 sm:mt-6 flex gap-2 sm:gap-3 flex-wrap"
-            >
-              <button
-                onClick={() => navigate(slide.href)}
-                className="flex items-center gap-1.5 bg-white text-stone-900 font-bold text-xs sm:text-sm px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl shadow-lg hover:bg-stone-100 transition-colors"
-              >
-                {slide.cta} <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.36 }}
+              className="mt-5 flex gap-3 flex-wrap">
+              <button onClick={() => navigate(slide.href)}
+                className="esup-font-body flex items-center gap-2 font-bold text-sm px-5 py-2.5 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95"
+                style={{ background: 'white', color: from }}>
+                {slide.cta} <ArrowRight className="h-4 w-4" />
               </button>
-              <button
-                onClick={() => navigate('/register')}
-                className="flex items-center gap-1.5 bg-white/20 text-white font-semibold text-xs sm:text-sm px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl hover:bg-white/30 transition-colors"
-              >
+              <button onClick={() => navigate('/register')}
+                className="esup-font-body flex items-center gap-2 font-semibold text-sm px-5 py-2.5 rounded-xl transition-all hover:scale-105"
+                style={{ background: 'rgba(255,255,255,0.18)', color: 'white', backdropFilter: 'blur(4px)' }}>
                 Créer un compte
               </button>
             </motion.div>
@@ -220,18 +364,20 @@ function HeroSlider() {
         </motion.div>
       </AnimatePresence>
 
-      <button onClick={() => setCurrent(c => (c - 1 + SLIDES.length) % SLIDES.length)}
-        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center transition-colors">
-        <ChevronLeft className="h-3.5 w-3.5" />
-      </button>
-      <button onClick={() => setCurrent(c => (c + 1) % SLIDES.length)}
-        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center transition-colors">
-        <ChevronRight className="h-3.5 w-3.5" />
-      </button>
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+      {/* Nav */}
+      {[{ dir: -1, Icon: ChevronLeft, side: 'left-3' }, { dir: 1, Icon: ChevronRight, side: 'right-3' }].map(({ dir, Icon, side }) => (
+        <button key={side}
+          onClick={() => go((current + SLIDES.length + dir) % SLIDES.length)}
+          className={`absolute ${side} top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110`}
+          style={{ background: 'rgba(255,255,255,0.2)', color: 'white', backdropFilter: 'blur(4px)' }}>
+          <Icon className="h-4 w-4" />
+        </button>
+      ))}
+
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20">
         {SLIDES.map((_, i) => (
-          <button key={i} onClick={() => setCurrent(i)}
-            className={`rounded-full transition-all duration-300 ${i === current ? 'w-5 h-1.5 bg-white' : 'w-1.5 h-1.5 bg-white/40'}`} />
+          <button key={i} onClick={() => go(i)}
+            className={`rounded-full transition-all duration-300 ${i === current ? 'w-6 h-1.5 bg-white' : 'w-1.5 h-1.5 bg-white/40'}`} />
         ))}
       </div>
     </div>
@@ -239,7 +385,7 @@ function HeroSlider() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// HERO BANNER — mobile: slider seul + pubs dessous / desktop: 3 colonnes
+// HERO BANNER
 // ─────────────────────────────────────────────────────────────
 function HeroBanner() {
   const { data: leftAds } = useQuery({
@@ -254,18 +400,19 @@ function HeroBanner() {
   })
 
   return (
-    <section className="bg-stone-50 py-3 sm:py-4">
+    <section className="py-3 sm:py-5" style={{ background: 'var(--esup-cream)' }}>
       <div className="container-app">
-        {/* MOBILE : slider plein + 2 pubs horizontales sous */}
+        {/* Mobile */}
         <div className="block sm:hidden space-y-3">
           <HeroSlider />
           <div className="grid grid-cols-2 gap-3">
-            <AdSlot ads={leftAds} side="left" minHeight={80} />
-            <AdSlot ads={rightAds} side="right" minHeight={80} />
+            <AdSlot ads={leftAds} side="left" minHeight={72} />
+            <AdSlot ads={rightAds} side="right" minHeight={72} />
           </div>
         </div>
-        {/* DESKTOP : 3 colonnes */}
-        <div className="hidden sm:grid sm:grid-cols-[140px_1fr_140px] lg:grid-cols-[180px_1fr_180px] xl:grid-cols-[200px_1fr_200px] gap-4 items-stretch">
+        {/* Desktop */}
+        <div className="hidden sm:grid gap-4 items-stretch"
+          style={{ gridTemplateColumns: 'clamp(130px,13vw,190px) 1fr clamp(130px,13vw,190px)' }}>
           <AdSlot ads={leftAds} side="left" />
           <HeroSlider />
           <AdSlot ads={rightAds} side="right" />
@@ -276,11 +423,12 @@ function HeroBanner() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// BARRE DE RECHERCHE
+// SEARCH BAR — warm, tactile
 // ─────────────────────────────────────────────────────────────
 function SearchBar() {
   const navigate = useNavigate()
   const [q, setQ] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -288,18 +436,27 @@ function SearchBar() {
   }
 
   return (
-    <div className="bg-white border-b border-stone-200 py-2.5 sm:py-3 sticky top-0 z-30 shadow-sm">
-      <div className="container-app">
-        <form onSubmit={handleSearch} className="flex items-center gap-2 bg-stone-100 rounded-xl px-3 sm:px-4 py-2 sm:py-2.5 border border-stone-200 focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/20 transition-all">
-          <input
-            value={q}
-            onChange={e => setQ(e.target.value)}
+    <div className="sticky top-0 z-30 border-b" style={{ background: 'white', borderColor: 'rgba(139,94,60,0.12)' }}>
+      <div className="container-app py-2.5 sm:py-3">
+        <form onSubmit={handleSearch}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all"
+          style={{ background: 'var(--esup-warm)', borderColor: 'rgba(139,94,60,0.2)' }}
+          onClick={() => inputRef.current?.focus()}>
+          <Search className="h-4 w-4 shrink-0" style={{ color: 'var(--esup-earth)', opacity: 0.6 }} />
+          <input ref={inputRef}
+            value={q} onChange={e => setQ(e.target.value)}
             placeholder="Rechercher un produit, une marque…"
-            className="flex-1 bg-transparent text-xs sm:text-sm text-stone-800 placeholder:text-stone-400 outline-none min-w-0"
-          />
-          <button type="submit" className="flex items-center gap-1 sm:gap-1.5 bg-brand-orange text-stone-900 font-bold text-xs px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-brand-orange-dark transition-colors shrink-0">
-            <ShoppingCart className="h-3.5 w-3.5" />
+            className="esup-font-body flex-1 bg-transparent text-sm outline-none min-w-0"
+            style={{ color: 'var(--esup-dark)' }} />
+          <div className="hidden sm:flex items-center gap-1.5 text-xs"
+            style={{ color: 'var(--esup-earth)', opacity: 0.5 }}>
+            <MapPin className="h-3 w-3" /> Abidjan
+          </div>
+          <button type="submit"
+            className="esup-font-body flex items-center gap-1.5 font-bold text-xs px-4 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shrink-0"
+            style={{ background: 'var(--esup-amber)', color: 'white' }}>
             <span className="hidden sm:inline">Rechercher</span>
+            <span className="sm:hidden"><Search className="h-3.5 w-3.5" /></span>
           </button>
         </form>
       </div>
@@ -308,66 +465,146 @@ function SearchBar() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// RAYONS — scroll horizontal sur mobile, grille sur desktop
+// CATEGORY HELPERS
 // ─────────────────────────────────────────────────────────────
+function getCatImageUrl(cat: { image?: string; image_url?: string }): string | null {
+  if (cat.image_url) return cat.image_url
+  if (cat.image) return storageUrl(cat.image)
+  return null
+}
+
+const CAT_PALETTES = [
+  ['#e8820c', '#f5a623'], ['#4a5e2e', '#6b8c3e'], ['#1a6b8a', '#2d9cca'],
+  ['#8b3a9e', '#b84fd0'], ['#c0392b', '#e74c3c'], ['#16706b', '#1abc9a'],
+  ['#c07a0c', '#e8a810'], ['#1a3e8b', '#2d62ca'], ['#9e3a6b', '#cc4f8d'],
+  ['#4a7e2e', '#6bb84f'], ['#8b6a0c', '#c0950c'], ['#0c6b8b', '#0ca8cc'],
+  ['#5e2e8b', '#8b4fd0'],
+]
+
+function catGradient(name: string) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff
+  return CAT_PALETTES[h % CAT_PALETTES.length]
+}
+
+// ─────────────────────────────────────────────────────────────
+// RAYONS SECTION
+// ─────────────────────────────────────────────────────────────
+function RayonCard({ cat, index }: { cat: any; index: number }) {
+  const imgUrl = getCatImageUrl(cat)
+  const [c1, c2] = catGradient(cat.name)
+  const initial = cat.name.charAt(0).toUpperCase()
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05, duration: 0.4 }}
+      whileHover={{ y: -6, scale: 1.03 }}
+      className="group">
+      <Link to={`/rayons/${cat.slug}`}
+        className="relative flex flex-col items-center justify-end overflow-hidden rounded-2xl shadow-sm hover:shadow-lg transition-shadow duration-300"
+        style={{ aspectRatio: '3/4' }}>
+        {imgUrl ? (
+          <img src={imgUrl} alt={cat.name}
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center"
+            style={{ background: `linear-gradient(150deg, ${c1} 0%, ${c2} 100%)` }}>
+            <span className="esup-font-display text-4xl font-black text-white/50 select-none">{initial}</span>
+          </div>
+        )}
+        <div className="absolute inset-0 transition-all duration-300"
+          style={{ background: 'linear-gradient(to top, rgba(20,12,4,0.82) 0%, rgba(20,12,4,0.1) 50%, transparent 100%)' }} />
+        <div className="relative z-10 w-full px-2 pb-2.5">
+          <p className="esup-font-body text-[10px] sm:text-[11px] font-bold text-white text-center leading-tight line-clamp-2">
+            {cat.name}
+          </p>
+        </div>
+      </Link>
+    </motion.div>
+  )
+}
+
+function RayonCardMobile({ cat }: { cat: any }) {
+  const imgUrl = getCatImageUrl(cat)
+  const [c1, c2] = catGradient(cat.name)
+  const initial = cat.name.charAt(0).toUpperCase()
+
+  return (
+    <Link to={`/rayons/${cat.slug}`}
+      className="relative flex flex-col items-center justify-end overflow-hidden rounded-2xl shrink-0 snap-start active:scale-95 transition-transform duration-150"
+      style={{ width: 72, height: 84 }}>
+      {imgUrl ? (
+        <img src={imgUrl} alt={cat.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center"
+          style={{ background: `linear-gradient(150deg, ${c1} 0%, ${c2} 100%)` }}>
+          <span className="esup-font-display text-xl font-black text-white/60 select-none">{initial}</span>
+        </div>
+      )}
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(20,12,4,0.78) 0%, transparent 60%)' }} />
+      <span className="relative z-10 text-[8px] font-bold text-white text-center leading-tight px-1 pb-1.5 line-clamp-2">
+        {cat.name}
+      </span>
+    </Link>
+  )
+}
+
 function RayonsSection() {
-  const { data: categories, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['categories'],
-    queryFn: () => categoryApi.list().then(r => r.data),
+    queryFn: () => categoryApi.list(),
     staleTime: 1000 * 60 * 30,
   })
 
-  const filtered = categories?.filter(c => c.show_in_menu).slice(0, 13) ?? []
+  const categories = Array.isArray(data) ? data : (data as any)?.data ?? []
+  const filtered = categories.filter((c: any) => c.show_in_menu).slice(0, 13)
 
   return (
-    <section className="py-6 sm:py-10 bg-white">
+    <section className="py-7 sm:py-10 bg-white">
       <div className="container-app">
-        <div className="flex items-center justify-between mb-3 sm:mb-6">
-          <h2 className="text-base sm:text-xl font-black text-stone-900 uppercase tracking-tight">e-Sup'M Rayons</h2>
-          <Link to="/rayons" className="flex items-center gap-1 text-brand-orange font-semibold text-xs sm:text-sm hover:underline shrink-0">
+        <div className="flex items-center justify-between mb-4 sm:mb-7">
+          <h2 className="esup-font-display section-title-line text-lg sm:text-2xl font-black"
+            style={{ color: 'var(--esup-dark)' }}>
+            Nos Rayons
+          </h2>
+          <Link to="/rayons"
+            className="esup-font-body flex items-center gap-1 text-sm font-semibold hover:underline"
+            style={{ color: 'var(--esup-amber)' }}>
             Tout voir <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </div>
 
-        {/* Mobile : scroll horizontal */}
-        <div className="flex sm:hidden gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide snap-x snap-mandatory">
+        {/* Mobile */}
+        <div className="flex sm:hidden gap-2.5 overflow-x-auto pb-2 -mx-4 px-4 hide-scroll snap-x snap-mandatory">
           {isLoading
-            ? Array(8).fill(0).map((_, i) => <div key={i} className="w-[62px] h-[62px] rounded-xl bg-stone-100 animate-pulse shrink-0" />)
-            : filtered.map((cat, i) => (
-                <Link key={cat.id} to={`/rayons/${cat.slug}`}
-                  className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 w-[62px] h-[62px] shrink-0 snap-start text-center active:scale-95 transition-all ${RAYON_COLORS[i % RAYON_COLORS.length]}`}
-                >
-                  {RAYON_ICONS[cat.slug] ?? <ShoppingBag className="h-5 w-5" />}
-                  <span className="text-[8px] font-bold leading-tight line-clamp-2">{cat.name}</span>
-                </Link>
-              ))
+            ? Array(8).fill(0).map((_, i) => <div key={i} className="w-[72px] h-[84px] rounded-2xl bg-stone-100 animate-pulse shrink-0" />)
+            : filtered.map((cat: any) => <RayonCardMobile key={cat.id} cat={cat} />)
           }
           <Link to="/rayons"
-            className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 border-dashed border-stone-300 w-[62px] h-[62px] shrink-0 snap-start hover:border-brand-orange transition-all">
-            <ChevronRight className="h-4 w-4 text-stone-400" />
-            <span className="text-[8px] font-bold text-stone-400 text-center">Voir tout</span>
+            className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed shrink-0 snap-start transition-all"
+            style={{ width: 72, height: 84, borderColor: 'rgba(139,94,60,0.25)' }}>
+            <ChevronRight className="h-4 w-4" style={{ color: 'var(--esup-earth)', opacity: 0.5 }} />
+            <span className="text-[8px] font-bold text-center" style={{ color: 'var(--esup-earth)', opacity: 0.5 }}>Voir tout</span>
           </Link>
         </div>
 
-        {/* Desktop : grille */}
+        {/* Desktop */}
         <div className="hidden sm:grid sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-3">
           {isLoading
-            ? Array(13).fill(0).map((_, i) => <div key={i} className="aspect-square rounded-2xl bg-stone-100 animate-pulse" />)
-            : filtered.map((cat, i) => (
-                <motion.div key={cat.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.03 }} whileHover={{ scale: 1.06 }}>
-                  <Link to={`/rayons/${cat.slug}`}
-                    className={`flex flex-col items-center justify-center gap-2.5 p-3 rounded-2xl border-2 aspect-square transition-all cursor-pointer ${RAYON_COLORS[i % RAYON_COLORS.length]}`}>
-                    {RAYON_ICONS[cat.slug] ?? <ShoppingBag className="h-6 w-6" />}
-                    <span className="text-[10px] font-bold text-center leading-tight line-clamp-2">{cat.name}</span>
-                  </Link>
-                </motion.div>
-              ))
+            ? Array(13).fill(0).map((_, i) => <div key={i} className="aspect-[3/4] rounded-2xl bg-stone-100 animate-pulse" />)
+            : filtered.map((cat: any, i: number) => <RayonCard key={cat.id} cat={cat} index={i} />)
           }
-          <Link to="/rayons"
-            className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border-2 border-dashed border-stone-300 aspect-square hover:border-brand-orange hover:bg-amber-50 transition-all">
-            <ChevronRight className="h-5 w-5 text-stone-400" />
-            <span className="text-[10px] font-bold text-stone-400 text-center">Voir tout</span>
-          </Link>
+          <motion.div whileHover={{ y: -4 }}>
+            <Link to="/rayons"
+              className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed transition-all"
+              style={{ aspectRatio: '3/4', borderColor: 'rgba(139,94,60,0.25)' }}>
+              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'var(--esup-warm)' }}>
+                <ChevronRight className="h-5 w-5" style={{ color: 'var(--esup-earth)' }} />
+              </div>
+              <span className="esup-font-body text-[10px] font-bold" style={{ color: 'var(--esup-earth)', opacity: 0.5 }}>Voir tout</span>
+            </Link>
+          </motion.div>
         </div>
       </div>
     </section>
@@ -375,79 +612,103 @@ function RayonsSection() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PRODUCT CARD
+// PRODUCT CARD — warm, natural
 // ─────────────────────────────────────────────────────────────
 function ProductCard({ product }: { product: Product }) {
   const { addItem, isAdding } = useCart()
   const navigate = useNavigate()
 
-  const labelConfig: Record<string, { text: string; color: string }> = {
-    stock_limite:  { text: 'Stock limité', color: 'bg-orange-500' },
-    promo:         { text: product.admin_label_discount ? `-${product.admin_label_discount}%` : 'Promo', color: 'bg-red-600' },
-    stock_epuise:  { text: 'Épuisé', color: 'bg-stone-500' },
-    offre_limitee: { text: 'Offre limitée', color: 'bg-purple-600' },
-    vote_rayon:    { text: 'Vote rayon', color: 'bg-blue-600' },
+  const LABELS: Record<string, { text: string; bg: string; fg: string }> = {
+    stock_limite:  { text: 'Stock limité', bg: '#f97316', fg: 'white' },
+    promo:         { text: product.admin_label_discount ? `-${product.admin_label_discount}%` : 'Promo', bg: '#dc2626', fg: 'white' },
+    stock_epuise:  { text: 'Épuisé', bg: '#6b7280', fg: 'white' },
+    offre_limitee: { text: 'Offre limitée', bg: '#7c3aed', fg: 'white' },
+    vote_rayon:    { text: 'Vote rayon', bg: '#2563eb', fg: 'white' },
   }
-
-  const label = product.admin_label !== 'none' ? labelConfig[product.admin_label] : null
+  const label = product.admin_label !== 'none' ? LABELS[product.admin_label] : null
 
   return (
-    <motion.div whileHover={{ y: -4 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.2 }}
-      className="overflow-hidden group bg-white rounded-xl sm:rounded-2xl border border-stone-100 shadow-sm">
+    <motion.div whileHover={{ y: -5 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.25 }}
+      className="product-card overflow-hidden bg-white rounded-2xl border transition-shadow hover:shadow-lg"
+      style={{ borderColor: 'rgba(139,94,60,0.1)' }}>
       <div onClick={() => navigate(`/produit/${product.slug}`)}
-        className="relative aspect-[4/3] bg-stone-50 overflow-hidden cursor-pointer">
+        className="relative overflow-hidden cursor-pointer" style={{ aspectRatio: '4/3', background: 'var(--esup-warm)' }}>
         {product.primary_image_url ? (
           <img src={product.primary_image_url} alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+            className="product-img w-full h-full object-cover transition-transform duration-500" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <ShoppingCart className="h-10 w-10 text-stone-300" />
+            <ShoppingCart className="h-10 w-10" style={{ color: 'var(--esup-earth)', opacity: 0.25 }} />
           </div>
         )}
-        <div className="absolute top-1.5 left-1.5 flex flex-col gap-1">
-          {label && <span className={`${label.color} text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full`}>{label.text}</span>}
-          {product.is_new && !label && <span className="bg-amber-500 text-stone-900 text-[9px] font-bold px-1.5 py-0.5 rounded-full">Nouveau</span>}
-          {product.is_bio && <span className="bg-green-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Leaf className="h-2 w-2" />Bio</span>}
-          {product.is_local && <span className="bg-emerald-700 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">Local CI</span>}
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          {label && (
+            <span className="esup-font-body text-[9px] font-bold px-2 py-0.5 rounded-full"
+              style={{ background: label.bg, color: label.fg }}>{label.text}</span>
+          )}
+          {product.is_new && !label && (
+            <span className="esup-font-body text-[9px] font-bold px-2 py-0.5 rounded-full"
+              style={{ background: 'var(--esup-amber)', color: 'white' }}>Nouveau</span>
+          )}
+          {product.is_bio && (
+            <span className="esup-font-body text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5"
+              style={{ background: '#16a34a', color: 'white' }}>
+              <Leaf className="h-2 w-2" />Bio
+            </span>
+          )}
+          {product.is_local && (
+            <span className="esup-font-body text-[9px] font-bold px-2 py-0.5 rounded-full"
+              style={{ background: '#166534', color: 'white' }}>Local CI</span>
+          )}
         </div>
         {product.discount_percentage && (
-          <div className="absolute top-1.5 right-1.5 w-8 h-8 sm:w-9 sm:h-9 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] sm:text-[10px] font-black">
+          <div className="absolute top-2 right-2 w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-black text-white"
+            style={{ background: '#dc2626' }}>
             -{product.discount_percentage}%
           </div>
         )}
         {!product.in_stock && (
-          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-            <span className="bg-stone-800 text-white text-[10px] font-bold px-2.5 py-1 rounded-full">Épuisé</span>
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.75)' }}>
+            <span className="esup-font-body text-[10px] font-bold px-3 py-1.5 rounded-full" style={{ background: 'var(--esup-dark)', color: 'white' }}>Épuisé</span>
           </div>
         )}
       </div>
-      <div className="p-2.5 sm:p-4">
-        <p className="text-[9px] sm:text-xs font-semibold text-stone-400 uppercase tracking-wider mb-0.5 truncate">
+      <div className="p-3 sm:p-4">
+        <p className="esup-font-body text-[9px] sm:text-xs font-semibold uppercase tracking-wider mb-0.5 truncate"
+          style={{ color: 'var(--esup-earth)', opacity: 0.65 }}>
           {product.category?.name ?? product.brand}
         </p>
         <h3 onClick={() => navigate(`/produit/${product.slug}`)}
-          className="text-xs sm:text-sm font-semibold text-stone-900 line-clamp-2 leading-snug cursor-pointer hover:text-brand-orange transition-colors">
+          className="esup-font-body text-xs sm:text-sm font-semibold line-clamp-2 leading-snug cursor-pointer transition-colors"
+          style={{ color: 'var(--esup-dark)' }}>
           {product.name}
         </h3>
         {product.reviews_count > 0 && (
-          <div className="flex items-center gap-1 mt-0.5">
-            <Star className="h-2.5 w-2.5 text-brand-orange fill-brand-orange" />
-            <span className="text-[10px] font-semibold text-stone-700">{product.average_rating.toFixed(1)}</span>
+          <div className="flex items-center gap-1 mt-1">
+            <Star className="h-2.5 w-2.5 fill-current" style={{ color: 'var(--esup-amber)' }} />
+            <span className="esup-font-body text-[10px] font-semibold" style={{ color: 'var(--esup-earth)' }}>
+              {product.average_rating.toFixed(1)}
+            </span>
           </div>
         )}
-        <div className="flex items-center justify-between mt-2 sm:mt-3">
+        <div className="flex items-center justify-between mt-3">
           <div>
-            <p className="text-sm sm:text-base font-black text-stone-900">{formatCurrency(product.price)}</p>
+            <p className="esup-font-display text-sm sm:text-base font-black" style={{ color: 'var(--esup-dark)' }}>
+              {formatCurrency(product.price)}
+            </p>
             {product.compare_price && (
-              <p className="text-[10px] text-stone-400 line-through">{formatCurrency(product.compare_price)}</p>
+              <p className="esup-font-body text-[10px] line-through" style={{ color: 'var(--esup-earth)', opacity: 0.5 }}>
+                {formatCurrency(product.compare_price)}
+              </p>
             )}
           </div>
-          <motion.button whileTap={{ scale: 0.9 }}
+          <motion.button whileTap={{ scale: 0.88 }}
             onClick={() => product.in_stock && addItem({ productId: product.id, quantity: 1 })}
             disabled={!product.in_stock || isAdding}
-            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all ${
-              product.in_stock ? 'bg-brand-orange hover:bg-brand-orange-dark shadow-md text-stone-900' : 'bg-stone-100 text-stone-300 cursor-not-allowed'
-            }`}>
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all shadow-sm"
+            style={product.in_stock
+              ? { background: 'var(--esup-amber)', color: 'white' }
+              : { background: 'var(--esup-warm)', color: 'var(--esup-earth)', opacity: 0.4, cursor: 'not-allowed' }}>
             <ShoppingCart className="h-3.5 w-3.5" />
           </motion.button>
         </div>
@@ -457,52 +718,37 @@ function ProductCard({ product }: { product: Product }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PRODUITS VEDETTES - CORRIGÉ AVEC LE HOOK
+// FEATURED SECTION
 // ─────────────────────────────────────────────────────────────
 function FeaturedSection() {
   const { data: response, isLoading } = useQuery({
     queryKey: ['products', 'featured'],
     queryFn: () => productApi.featured().then(r => r.data),
   })
-
   const products = useNormalizedProducts(response)
 
-  if (isLoading) {
-    return (
-      <section className="py-6 sm:py-10 bg-stone-50">
-        <div className="container-app">
-          <div className="flex items-center justify-between mb-3 sm:mb-6">
-            <h2 className="text-base sm:text-xl font-black text-stone-900 flex items-center gap-1.5">
-              <Star className="h-4 w-4 sm:h-5 sm:w-5 text-brand-orange fill-brand-orange" />
-              Produits Vedettes
-            </h2>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
-            {Array(4).fill(0).map((_, i) => <ProductCardSkeleton key={i} />)}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  if (!products.length) return null
-
   return (
-    <section className="py-6 sm:py-10 bg-stone-50">
+    <section className="py-7 sm:py-10" style={{ background: 'var(--esup-cream)' }}>
       <div className="container-app">
-        <div className="flex items-center justify-between mb-3 sm:mb-6">
-          <h2 className="text-base sm:text-xl font-black text-stone-900 flex items-center gap-1.5">
-            <Star className="h-4 w-4 sm:h-5 sm:w-5 text-brand-orange fill-brand-orange" />
+        <div className="flex items-center justify-between mb-4 sm:mb-7">
+          <h2 className="esup-font-display section-title-line text-lg sm:text-2xl font-black flex items-center gap-2"
+            style={{ color: 'var(--esup-dark)' }}>
+            <Flame className="h-5 w-5" style={{ color: 'var(--esup-amber)' }} />
             Produits Vedettes
           </h2>
-          <Link to="/catalogue?sort=sales_count" className="flex items-center gap-1 text-brand-orange font-semibold text-xs sm:text-sm hover:underline shrink-0">
-            Voir tout <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
+          {!isLoading && products.length > 0 && (
+            <Link to="/catalogue?sort=sales_count"
+              className="esup-font-body flex items-center gap-1 text-sm font-semibold hover:underline"
+              style={{ color: 'var(--esup-amber)' }}>
+              Voir tout <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
-          {products.slice(0, 4).map((product: Product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+          {isLoading
+            ? Array(4).fill(0).map((_, i) => <ProductCardSkeleton key={i} />)
+            : products.slice(0, 5).map((p: Product) => <ProductCard key={p.id} product={p} />)
+          }
         </div>
       </div>
     </section>
@@ -510,120 +756,223 @@ function FeaturedSection() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// GOOD BOX — CARTONS 3D ANIMÉS
+// GOOD BOX — cartons réduits, textes en dehors, pub agrandies
 // ─────────────────────────────────────────────────────────────
-interface CartonItem {
+interface BoxItem {
   icon: React.ReactNode
   label: string
   sub?: string
   href: string
   accentColor: string
+  tagColor: string
 }
 
-const GOOD_BOX_ITEMS: CartonItem[] = [
-  { icon: <Tag className="h-4 w-4 sm:h-5 sm:w-5" />,            label: 'Promo',             href: '/catalogue?filter=promo',    accentColor: '#ef4444' },
-  { icon: <Zap className="h-4 w-4 sm:h-5 sm:w-5" />,            label: 'Solde',             href: '/catalogue?filter=solde',    accentColor: '#f97316' },
-  { icon: <Package className="h-4 w-4 sm:h-5 sm:w-5" />,        label: 'Déstockage',        sub: 'consommer avant…',            href: '/catalogue?filter=destockage', accentColor: '#eab308' },
-  { icon: <UtensilsCrossed className="h-4 w-4 sm:h-5 sm:w-5"/>, label: 'Panier menu',       href: '/good-box/menu',             accentColor: '#22c55e' },
-  { icon: <Heart className="h-4 w-4 sm:h-5 sm:w-5" />,          label: 'Panier charity',    sub: 'dons alimentaires',           href: '/charity',                   accentColor: '#10b981' },
-  { icon: <Repeat className="h-4 w-4 sm:h-5 sm:w-5" />,         label: 'Abonnement',        sub: 'panier essentiel',            href: '/subscriptions',             accentColor: '#3b82f6' },
-  { icon: <Gift className="h-4 w-4 sm:h-5 sm:w-5" />,           label: 'Panier évent',      sub: 'anniv, naissance…',           href: '/good-box/event',            accentColor: '#a855f7' },
-  { icon: <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />,       label: 'Nouveautés',        sub: 'découverte…',                 href: '/catalogue?sort=created_at', accentColor: '#ec4899' },
-  { icon: <Truck className="h-4 w-4 sm:h-5 sm:w-5" />,          label: 'Déléguer',          sub: 'listez, on s\'exécute',       href: '/good-box/delegation',       accentColor: '#14b8a6' },
+const GOOD_BOX_ITEMS: BoxItem[] = [
+  { icon: <Tag />,            label: 'Promo',          href: '/catalogue?filter=promo',      accentColor: '#dc2626', tagColor: '#fca5a5' },
+  { icon: <Zap />,            label: 'Solde',          href: '/catalogue?filter=solde',       accentColor: '#ea580c', tagColor: '#fdba74' },
+  { icon: <Package />,        label: 'Déstockage',     sub: 'consommer avant…',              href: '/catalogue?filter=destockage',  accentColor: '#ca8a04', tagColor: '#fde68a' },
+  { icon: <UtensilsCrossed/>, label: 'Panier menu',    href: '/good-box/menu',               accentColor: '#16a34a', tagColor: '#bbf7d0' },
+  { icon: <Heart />,          label: 'Panier charity', sub: 'dons alimentaires',             href: '/charity',                      accentColor: '#0d9488', tagColor: '#99f6e4' },
+  { icon: <Repeat />,         label: 'Abonnement',     sub: 'panier essentiel',              href: '/subscriptions',               accentColor: '#2563eb', tagColor: '#bfdbfe' },
+  { icon: <Gift />,           label: 'Panier évent',   sub: 'anniversaire, naissance…',      href: '/good-box/event',              accentColor: '#9333ea', tagColor: '#e9d5ff' },
+  { icon: <Sparkles />,       label: 'Nouveautés',     sub: 'découverte…',                   href: '/catalogue?sort=created_at',   accentColor: '#db2777', tagColor: '#fbcfe8' },
+  { icon: <Truck />,          label: 'Déléguer',       sub: 'listez, on s\'exécute',         href: '/good-box/delegation',         accentColor: '#0891b2', tagColor: '#a5f3fc' },
 ]
 
-const CARTON_STYLES = `
-@keyframes gbPopIn {
-  0%   { opacity:0; transform:scale(0.55) translateY(20px); }
-  70%  { transform:scale(1.08) translateY(-5px); }
-  100% { opacity:1; transform:scale(1) translateY(0); }
-}
-.gb-carton { animation:gbPopIn 0.45s both; perspective:500px; }
-.gb-carton:nth-child(1){animation-delay:.05s}
-.gb-carton:nth-child(2){animation-delay:.10s}
-.gb-carton:nth-child(3){animation-delay:.15s}
-.gb-carton:nth-child(4){animation-delay:.20s}
-.gb-carton:nth-child(5){animation-delay:.25s}
-.gb-carton:nth-child(6){animation-delay:.30s}
-.gb-carton:nth-child(7){animation-delay:.35s}
-.gb-carton:nth-child(8){animation-delay:.40s}
-.gb-carton:nth-child(9){animation-delay:.45s}
-.gb-carton-inner{transition:transform 0.35s cubic-bezier(.34,1.56,.64,1);transform-style:preserve-3d;position:relative;width:100%;height:100%;}
-.gb-carton:hover .gb-carton-inner{transform:rotateX(-9deg) rotateY(7deg) scale(1.07);}
-.gb-wood{background:repeating-linear-gradient(175deg,rgba(255,255,255,0.05) 0px,rgba(255,255,255,0.05) 2px,transparent 2px,transparent 8px),linear-gradient(170deg,#b5783a 0%,#8b5a2b 35%,#c49a51 60%,#7a4a1e 100%);border:2px solid rgba(255,255,255,0.28);}
-.gb-carton:hover .gb-wood{background:repeating-linear-gradient(175deg,rgba(255,255,255,0.08) 0px,rgba(255,255,255,0.08) 2px,transparent 2px,transparent 8px),linear-gradient(170deg,#d08b48 0%,#a0682e 35%,#e0b560 60%,#8f5a28 100%);}
-.gb-tip{display:none;}
-.gb-carton:hover .gb-tip{display:block;}
-@media(max-width:640px){
-  .gb-carton:hover .gb-carton-inner{transform:none;}
-  .gb-carton:active .gb-carton-inner{transform:scale(0.93);}
-  .gb-tip{display:none!important;}
-}
-`
-
-function Carton({ item }: { item: CartonItem }) {
+// Carton simplifié — icône seule dans la boîte, texte en dessous
+function CartonBox({ item, index }: { item: BoxItem; index: number }) {
   const navigate = useNavigate()
-  const flapH = 'clamp(20px,3.5vw,28px)'
+  const FLAP_H = 20
+
   return (
-    <div className="gb-carton relative cursor-pointer" style={{ height: 'clamp(75px,14vw,110px)' }} onClick={() => navigate(item.href)}>
-      <div className="gb-carton-inner">
-        <div style={{ position:'absolute', top:-6, left:5, width:'calc(100% - 5px)', height:8, background:'linear-gradient(180deg,#e8c06a,#c49a40)', borderRadius:'4px 4px 0 0', transform:'skewX(-2deg)', zIndex:-1 }} />
-        <div style={{ position:'absolute', top:5, right:-6, width:8, height:'calc(100% - 5px)', background:'linear-gradient(90deg,#5a3010,#3a1e08)', borderRadius:'0 4px 4px 0', transform:'skewY(-2deg)', zIndex:-1 }} />
-        <div className="gb-wood absolute inset-0 rounded-lg overflow-hidden">
-          <div style={{ position:'absolute', top:0, left:0, right:0, height:flapH, background:'linear-gradient(180deg,#d4a04a,#b5783a)', borderBottom:'1.5px solid rgba(0,0,0,0.2)', borderRadius:'6px 6px 0 0' }} />
-          <div style={{ position:'absolute', top:flapH, left:0, right:0, height:2, background:'rgba(0,0,0,0.12)' }} />
-          <div style={{ position:'absolute', top:flapH, left:0, bottom:0, width:4, background:item.accentColor, borderRadius:'0 0 0 4px' }} />
-          <div style={{ position:'absolute', top:flapH, left:4, right:0, bottom:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'3px 5px', gap:2 }}>
-            <span style={{ color:'rgba(255,255,255,0.92)', filter:'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }}>{item.icon}</span>
-            <span style={{ fontSize:'clamp(8px,1.8vw,11px)', fontWeight:700, color:'#fff', textAlign:'center', lineHeight:1.2, textShadow:'0 1px 3px rgba(0,0,0,0.6)' }}>{item.label}</span>
-            {item.sub && <span style={{ fontSize:'clamp(7px,1.2vw,9px)', fontWeight:600, color:'rgba(255,255,255,0.72)', textAlign:'center', lineHeight:1.2 }}>{item.sub}</span>}
+    <div className="flex flex-col items-center gap-1.5" style={{ animationDelay: `${index * 0.06}s` }}>
+      {/* La boîte carton (réduite, icône seule) */}
+      <div className="carton-box w-full" onClick={() => navigate(item.href)}>
+        <div className="carton-shadow-3d rounded-xl" />
+        <div className="carton-face rounded-xl overflow-hidden"
+          style={{ height: 'clamp(62px, 10vw, 82px)', position: 'relative' }}>
+          {/* Flap */}
+          <div className="carton-flap absolute top-0 left-0 right-0" style={{ height: FLAP_H, zIndex: 2 }}>
+            <div style={{ position: 'absolute', bottom: 0, left: '25%', right: '25%', height: 1, background: 'rgba(0,0,0,0.15)' }} />
+            <div style={{ position: 'absolute', top: '40%', left: '10%', width: 1, height: '60%', background: 'rgba(255,255,255,0.15)' }} />
+            <div style={{ position: 'absolute', top: '40%', right: '10%', width: 1, height: '60%', background: 'rgba(255,255,255,0.15)' }} />
+          </div>
+
+          {/* Fold shadow */}
+          <div style={{ position: 'absolute', top: FLAP_H, left: 0, right: 0, height: 2, background: 'rgba(0,0,0,0.18)', zIndex: 2 }} />
+
+          {/* Color accent stripe — left edge */}
+          <div style={{ position: 'absolute', top: FLAP_H + 2, left: 0, bottom: 0, width: 4, background: item.accentColor, zIndex: 3, borderRadius: '0 0 0 6px' }} />
+
+          {/* Icon stamp — centré dans la boîte */}
+          <div style={{ position: 'absolute', top: FLAP_H + 2, left: 4, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>
+            <div style={{
+              width: 34,
+              height: 34,
+              borderRadius: 8,
+              background: item.accentColor,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.2)',
+              color: 'white',
+            }}>
+              {item.icon}
+            </div>
+          </div>
+
+          {/* Tag top-right */}
+          <div style={{ position: 'absolute', top: 4, right: 5, zIndex: 4 }}>
+            <div style={{ padding: '1px 4px', borderRadius: 3, background: item.tagColor, fontSize: 6, fontWeight: 800, color: item.accentColor, letterSpacing: 0.4, textTransform: 'uppercase', fontFamily: 'system-ui' }}>
+              e-Sup'M
+            </div>
           </div>
         </div>
       </div>
-      <div className="gb-tip absolute bottom-[108%] left-1/2 -translate-x-1/2 bg-[#1e1b4b] text-[#fbbf24] text-[10px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap z-10 pointer-events-none"
-        style={{ boxShadow:'0 2px 8px rgba(0,0,0,0.4)' }}>
-        {item.label}
-        <span style={{ position:'absolute', top:'100%', left:'50%', transform:'translateX(-50%)', borderLeft:'5px solid transparent', borderRight:'5px solid transparent', borderTop:'5px solid #1e1b4b' }} />
+
+      {/* Texte en dehors de la boîte */}
+      <div className="text-center px-0.5">
+        <p className="esup-font-body font-bold text-white leading-tight"
+          style={{ fontSize: 'clamp(9px, 1.8vw, 12px)', lineHeight: 1.25, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
+          {item.label}
+        </p>
+        {item.sub && (
+          <p className="esup-font-body font-medium mt-0.5"
+            style={{ fontSize: 'clamp(7px, 1.2vw, 9px)', lineHeight: 1.1, color: 'rgba(255,255,255,0.6)' }}>
+            {item.sub}
+          </p>
+        )}
       </div>
     </div>
   )
 }
 
-function GoodBoxAdSlot({ side }: { side: 'left' | 'right' }) {
+// ─────────────────────────────────────────────────────────────
+// GOOD BOX AD SLOT — agrandi avec 3 slides mock
+// ─────────────────────────────────────────────────────────────
+interface GoodBoxAdSlotProps {
+  side: 'left' | 'right'
+}
+
+// Slides de démo pour les espaces pub (3 par côté)
+const GOODBOX_AD_MOCK = {
+  left: [
+    { id: 1, gradient: 'linear-gradient(145deg,#f97316,#ea580c)', icon: <Tag />, title: 'Promo -50%', sub: 'Offre limitée' },
+    { id: 2, gradient: 'linear-gradient(145deg,#0891b2,#0369a1)', icon: <Truck />, title: 'Livraison', sub: 'Gratuite dès 5000 F' },
+    { id: 3, gradient: 'linear-gradient(145deg,#16a34a,#15803d)', icon: <Leaf />, title: 'Produits Bio', sub: 'Origine locale CI' },
+  ],
+  right: [
+    { id: 1, gradient: 'linear-gradient(145deg,#7c3aed,#6d28d9)', icon: <Gift />, title: 'Gagnez !', sub: 'Jouez et tentez votre chance' },
+    { id: 2, gradient: 'linear-gradient(145deg,#db2777,#be185d)', icon: <Heart />, title: 'Charity', sub: 'Ensemble on agit' },
+    { id: 3, gradient: 'linear-gradient(145deg,#d97706,#b45309)', icon: <Star />, title: 'Fidélité', sub: '1 pt / 100 FCFA' },
+  ],
+}
+
+function GoodBoxAdSlot({ side }: GoodBoxAdSlotProps) {
   const { data: ads } = useQuery({
     queryKey: ['ads', `goodbox-${side}`],
     queryFn: () => advertisementApi?.list?.({ position: `goodbox_${side}` }).then((r: any) => r.data).catch(() => null),
     staleTime: 1000 * 60 * 10,
   })
+
   const [current, setCurrent] = useState(0)
-  const count = ads?.length ?? 0
+  const realAds = ads && ads.length > 0 ? ads : null
+  const mockSlides = GOODBOX_AD_MOCK[side]
+  const count = realAds ? realAds.length : mockSlides.length
+
   useEffect(() => {
     if (count < 2) return
-    const t = setInterval(() => setCurrent(c => (c + 1) % count), 4000)
+    const t = setInterval(() => setCurrent(c => (c + 1) % count), 3800)
     return () => clearInterval(t)
   }, [count])
 
   return (
-    <div className="flex flex-col items-center justify-center gap-2 p-2 sm:p-3"
-      style={{ background:'rgba(0,0,0,0.18)', borderRadius:10 }}>
-      {!ads || ads.length === 0 ? (
+    <div className="relative overflow-hidden rounded-xl flex flex-col"
+      style={{ background: 'rgba(0,0,0,0.2)', minHeight: 'clamp(110px, 18vw, 160px)' }}>
+      {realAds ? (
+        // Vraies pubs API
         <>
-          <div style={{ width:36, height:36, background:'rgba(255,255,255,0.15)', border:'1.5px dashed rgba(255,255,255,0.5)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center' }}>
-            {side === 'left' ? <Megaphone className="h-5 w-5 text-white/70" /> : <Monitor className="h-5 w-5 text-white/70" />}
-          </div>
-          <span style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.7)', textTransform:'uppercase', letterSpacing:1, textAlign:'center' }}>Pub</span>
-          <div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-white/40" /><div className="w-1.5 h-1.5 rounded-full bg-white/25" /></div>
-        </>
-      ) : (
-        <div className="relative w-full overflow-hidden rounded-lg" style={{ minHeight:70 }}>
           <AnimatePresence mode="wait">
-            <motion.div key={current} initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} transition={{ duration:0.5 }} className="absolute inset-0">
-              {ads[current].link
-                ? <a href={ads[current].link} target="_blank" rel="noopener noreferrer"><img src={ads[current].image_url} alt="Pub" className="w-full h-full object-cover rounded-lg" /></a>
-                : <img src={ads[current].image_url} alt="Pub" className="w-full h-full object-cover rounded-lg" />}
+            <motion.div key={current}
+              initial={{ opacity: 0, scale: 1.04 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.5 }}
+              className="absolute inset-0">
+              {realAds[current].link
+                ? <a href={realAds[current].link} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
+                    <img src={realAds[current].image_url} alt="Pub" className="w-full h-full object-cover" />
+                  </a>
+                : <img src={realAds[current].image_url} alt="Pub" className="w-full h-full object-cover" />
+              }
             </motion.div>
           </AnimatePresence>
-        </div>
+          {/* Dots */}
+          {count > 1 && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-10">
+              {realAds.map((_: any, i: number) => (
+                <button key={i} onClick={() => setCurrent(i)}
+                  className={`rounded-full transition-all duration-300 ${i === current ? 'w-4 h-1 bg-white' : 'w-1 h-1 bg-white/40'}`} />
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        // Slides de placeholder avec style raffiné
+        <>
+          <AnimatePresence mode="wait">
+            <motion.div key={current}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.45 }}
+              className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3"
+              style={{ background: mockSlides[current].gradient }}>
+              {/* Deco circle */}
+              <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-20"
+                style={{ background: 'radial-gradient(circle, white 0%, transparent 70%)' }} />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(4px)', color: 'white' }}>
+                {mockSlides[current].icon}
+              </div>
+              <div className="text-center">
+                <p className="esup-font-display font-black text-white leading-tight"
+                  style={{ fontSize: 'clamp(11px, 2vw, 15px)', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
+                  {mockSlides[current].title}
+                </p>
+                <p className="esup-font-body text-white/75 mt-0.5 font-medium"
+                  style={{ fontSize: 'clamp(8px, 1.3vw, 10px)' }}>
+                  {mockSlides[current].sub}
+                </p>
+              </div>
+              {/* Pub badge */}
+              <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded"
+                style={{ background: 'rgba(0,0,0,0.3)', fontSize: 7, color: 'rgba(255,255,255,0.6)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                Pub
+              </div>
+            </motion.div>
+          </AnimatePresence>
+          {/* Nav dots */}
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-10">
+            {mockSlides.map((_, i) => (
+              <button key={i} onClick={() => setCurrent(i)}
+                className={`rounded-full transition-all duration-300 ${i === current ? 'w-4 h-1 bg-white' : 'w-1 h-1 bg-white/40'}`} />
+            ))}
+          </div>
+          {/* Prev/Next arrows */}
+          <button
+            onClick={() => setCurrent(c => (c - 1 + count) % count)}
+            className="absolute left-1 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full flex items-center justify-center z-10"
+            style={{ background: 'rgba(0,0,0,0.3)', color: 'white' }}>
+            <ChevronLeft className="h-3 w-3" />
+          </button>
+          <button
+            onClick={() => setCurrent(c => (c + 1) % count)}
+            className="absolute right-1 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full flex items-center justify-center z-10"
+            style={{ background: 'rgba(0,0,0,0.3)', color: 'white' }}>
+            <ChevronRight className="h-3 w-3" />
+          </button>
+        </>
       )}
     </div>
   )
@@ -631,34 +980,69 @@ function GoodBoxAdSlot({ side }: { side: 'left' | 'right' }) {
 
 function GoodBoxSection() {
   return (
-    <section className="py-0">
-      <style dangerouslySetInnerHTML={{ __html: CARTON_STYLES }} />
-      <div
-        style={{ background:'linear-gradient(135deg,#b91c1c 0%,#ea580c 40%,#fbbf24 100%)', borderRadius:14, padding:'0 0 16px', overflow:'hidden' }}
-        className="container-app my-5 sm:my-8"
-      >
-        {/* HEADER : pub | titre | pub */}
-        <div style={{ display:'grid', gridTemplateColumns:'clamp(60px,14vw,160px) 1fr clamp(60px,14vw,160px)', alignItems:'stretch', minHeight:72 }}>
-          <GoodBoxAdSlot side="left" />
-          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'10px', gap:5 }}>
-            <div style={{ background:'#1e1b4b', border:'3px solid #b91c1c', borderRadius:8, padding:'7px 14px', textAlign:'center' }}>
-              <h2 style={{ fontFamily:'system-ui,sans-serif', fontSize:'clamp(11px,2.8vw,22px)', fontWeight:900, color:'#fbbf24', letterSpacing:0.8, margin:0, textShadow:'1px 1px 0 #000', textTransform:'uppercase', lineHeight:1.2 }}>
-                e-Sup'M Good Box Alimentaire
-              </h2>
-            </div>
-            <div style={{ width:0, height:0, borderLeft:'10px solid transparent', borderRight:'10px solid transparent', borderTop:'12px solid #1e1b4b' }} />
-          </div>
-          <GoodBoxAdSlot side="right" />
-        </div>
+    <section className="py-4 sm:py-6">
+      <style dangerouslySetInnerHTML={{ __html: `
+        .carton-box svg { width: clamp(14px, 2.6vw, 18px); height: clamp(14px, 2.6vw, 18px); }
+      ` }} />
+      <div className="container-app">
+        <div className="overflow-hidden rounded-2xl shadow-xl"
+          style={{ background: 'linear-gradient(150deg, #7c1d0a 0%, #b91c1c 40%, #e8820c 75%, #f5a623 100%)' }}>
 
-        {/* GRILLE : 3 colonnes mobile → 5 desktop (via inline override) */}
-        <div
-          className="grid gap-2.5 sm:gap-4 px-3 sm:px-6 pt-1"
-          style={{ gridTemplateColumns:'repeat(3,1fr)' }}
-        >
-          {/* Surcharge tailwind ne peut pas changer gridTemplateColumns dynamiquement, on utilise un style tag inline */}
-          <style>{`@media(min-width:640px){.gb-grid{grid-template-columns:repeat(5,1fr)!important;}}`}</style>
-          {GOOD_BOX_ITEMS.map(item => <Carton key={item.href} item={item} />)}
+          {/* ── Header : pub gauche | titre | pub droite ── */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'clamp(100px, 20vw, 210px) 1fr clamp(100px, 20vw, 210px)',
+            alignItems: 'stretch',
+            gap: 0,
+            padding: '10px 10px 0',
+          }}>
+            {/* Pub gauche */}
+            <GoodBoxAdSlot side="left" />
+
+            {/* Titre centré */}
+            <div className="flex flex-col items-center justify-center px-3 py-4 gap-2">
+              <div className="rounded-2xl px-5 py-3 text-center w-full"
+                style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(10px)', border: '2px solid rgba(255,255,255,0.15)' }}>
+                <h2 className="esup-font-display font-black text-white m-0"
+                  style={{
+                    fontSize: 'clamp(16px, 4vw, 32px)',
+                    letterSpacing: 0.5,
+                    lineHeight: 1.15,
+                    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                  }}>
+                  e-Sup'M Good Box
+                </h2>
+                <p className="esup-font-body m-0 mt-1" style={{ fontSize: 'clamp(10px, 1.8vw, 14px)', color: 'rgba(255,255,255,0.75)', fontWeight: 600, letterSpacing: 1 }}>
+                  Alimentaire
+                </p>
+              </div>
+              {/* Flèche vers cartons */}
+              <div style={{ width: 0, height: 0, borderLeft: '10px solid transparent', borderRight: '10px solid transparent', borderTop: '12px solid rgba(0,0,0,0.35)' }} />
+            </div>
+
+            {/* Pub droite */}
+            <GoodBoxAdSlot side="right" />
+          </div>
+
+          {/* ── Cartons grid — textes en dehors ── */}
+          <div className="px-3 sm:px-6 pb-5 pt-3"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 'clamp(8px, 2.5vw, 18px)',
+            }}>
+            <style>{`@media(min-width:640px){.good-box-grid-inner{grid-template-columns:repeat(5,1fr)!important;}}`}</style>
+            {GOOD_BOX_ITEMS.map((item, i) => (
+              <CartonBox key={item.href} item={item} index={i} />
+            ))}
+          </div>
+
+          {/* ── Responsive: 5 colonnes sur sm+ ── */}
+          <style>{`
+            @media(min-width:640px){
+              .goodbox-cartons-grid{grid-template-columns:repeat(5,1fr)!important;}
+            }
+          `}</style>
         </div>
       </div>
     </section>
@@ -666,45 +1050,53 @@ function GoodBoxSection() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// GAME ALIMENTAIRE
+// GAME SECTION
 // ─────────────────────────────────────────────────────────────
 const GAMES = [
-  { icon: <Gamepad2 className="h-5 w-5 sm:h-8 sm:w-8" />, title: "e-Sup'M Défis",       status: 'open',        href: '/games/defis',      color: 'from-amber-400 to-orange-500' },
-  { icon: <Gift className="h-5 w-5 sm:h-8 sm:w-8" />,     title: 'Carte à gratter',      status: 'conditioned', href: '/games/scratch',    color: 'from-pink-500 to-rose-500' },
-  { icon: <RefreshCw className="h-5 w-5 sm:h-8 sm:w-8"/>, title: "Roue e-Sup'M",         status: 'conditioned', href: '/games/wheel',      color: 'from-purple-500 to-violet-600' },
-  { icon: <Trophy className="h-5 w-5 sm:h-8 sm:w-8" />,   title: 'Juste Prix',           status: 'open',        href: '/games/juste-prix', color: 'from-green-500 to-emerald-600' },
-  { icon: <Lightbulb className="h-5 w-5 sm:h-8 sm:w-8"/>, title: 'Quiz',                 status: 'open',        href: '/games/quiz',       color: 'from-blue-500 to-cyan-500' },
-  { icon: <Users className="h-5 w-5 sm:h-8 sm:w-8" />,    title: "e-Sup'M Battle",       status: 'open',        href: '/games/battle',     color: 'from-red-500 to-orange-500' },
-  { icon: <Star className="h-5 w-5 sm:h-8 sm:w-8" />,     title: 'Calendrier Challenge', status: 'soon',        href: '/games/challenge',  color: 'from-stone-400 to-stone-500' },
+  { Icon: Gamepad2, title: "e-Sup'M Défis",      status: 'open',        href: '/games/defis',      from: '#d97706', to: '#ea580c' },
+  { Icon: Gift,     title: 'Carte à gratter',     status: 'conditioned', href: '/games/scratch',    from: '#db2777', to: '#e11d48' },
+  { Icon: RefreshCw,title: "Roue e-Sup'M",        status: 'conditioned', href: '/games/wheel',      from: '#7c3aed', to: '#6d28d9' },
+  { Icon: Trophy,   title: 'Juste Prix',           status: 'open',        href: '/games/juste-prix', from: '#059669', to: '#047857' },
+  { Icon: Lightbulb,title: 'Quiz',                 status: 'open',        href: '/games/quiz',       from: '#2563eb', to: '#1d4ed8' },
+  { Icon: Users,    title: "e-Sup'M Battle",       status: 'open',        href: '/games/battle',     from: '#dc2626', to: '#b91c1c' },
+  { Icon: Star,     title: 'Calendrier Challenge', status: 'soon',        href: '/games/challenge',  from: '#6b7280', to: '#4b5563' },
 ]
 
-const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
-  open:        { label: 'Ouvert à tous', cls: 'bg-green-500 text-white' },
-  conditioned: { label: 'Conditionné',   cls: 'bg-amber-500 text-stone-900' },
-  soon:        { label: 'Bientôt',       cls: 'bg-stone-400 text-white' },
+const STATUS_CFG = {
+  open:        { label: 'Ouvert', bg: '#dcfce7', fg: '#166534' },
+  conditioned: { label: 'Conditionné', bg: '#fef3c7', fg: '#92400e' },
+  soon:        { label: 'Bientôt', bg: '#f3f4f6', fg: '#374151' },
 }
 
 function GameSection() {
   return (
-    <section className="py-6 sm:py-10 bg-stone-50">
+    <section className="py-7 sm:py-10 bg-white">
       <div className="container-app">
-        <div className="flex items-center justify-between mb-3 sm:mb-6">
-          <h2 className="text-base sm:text-xl font-black text-stone-900">e-Sup'M Game Alimentaire</h2>
-          <Link to="/games" className="flex items-center gap-1 text-brand-orange font-semibold text-xs sm:text-sm hover:underline shrink-0">
+        <div className="flex items-center justify-between mb-4 sm:mb-7">
+          <h2 className="esup-font-display section-title-line text-lg sm:text-2xl font-black" style={{ color: 'var(--esup-dark)' }}>
+            e-Sup'M Game Alimentaire
+          </h2>
+          <Link to="/games" className="esup-font-body flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: 'var(--esup-amber)' }}>
             Voir tout <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        {/* 4 colonnes mobile, 7 desktop */}
-        <div className="grid grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-4">
-          {GAMES.map(({ icon, title, status, href, color }) => {
-            const s = STATUS_LABELS[status]
+        <div className="grid grid-cols-4 lg:grid-cols-7 gap-2.5 sm:gap-4">
+          {GAMES.map(({ Icon, title, status, href, from, to }) => {
+            const s = STATUS_CFG[status as keyof typeof STATUS_CFG]
             return (
               <Link key={href} to={href}>
-                <motion.div whileHover={{ scale: 1.04, y: -3 }} whileTap={{ scale: 0.95 }}
-                  className={`bg-gradient-to-br ${color} rounded-xl sm:rounded-2xl p-2.5 sm:p-5 text-white flex flex-col items-center gap-1.5 sm:gap-3 text-center shadow-sm h-full`}>
-                  {icon}
-                  <h3 className="text-[9px] sm:text-xs font-bold leading-tight">{title}</h3>
-                  <span className={`text-[8px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
+                <motion.div whileHover={{ scale: 1.05, y: -4 }} whileTap={{ scale: 0.95 }}
+                  className="rounded-2xl p-2.5 sm:p-5 flex flex-col items-center gap-2 sm:gap-3 text-center h-full shadow-sm"
+                  style={{ background: `linear-gradient(145deg, ${from} 0%, ${to} 100%)` }}>
+                  <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center"
+                    style={{ background: 'rgba(255,255,255,0.18)' }}>
+                    <Icon className="h-4 w-4 sm:h-6 sm:w-6 text-white" strokeWidth={2} />
+                  </div>
+                  <h3 className="esup-font-body text-[9px] sm:text-xs font-bold text-white leading-tight">{title}</h3>
+                  <span className="esup-font-body text-[8px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: s.bg, color: s.fg }}>
+                    {s.label}
+                  </span>
                 </motion.div>
               </Link>
             )
@@ -716,100 +1108,91 @@ function GameSection() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// NOUVEAUTÉS - CORRIGÉ AVEC LE HOOK
+// NEW ARRIVALS
 // ─────────────────────────────────────────────────────────────
 function NewArrivalsSection() {
   const { data: response, isLoading } = useQuery({
     queryKey: ['products', 'new-arrivals'],
     queryFn: () => productApi.newArrivals().then(r => r.data),
   })
-
   const products = useNormalizedProducts(response)
 
-  if (isLoading) {
-    return (
-      <section className="py-6 sm:py-10 bg-white">
-        <div className="container-app">
-          <div className="flex items-center justify-between mb-3 sm:mb-6">
-            <h2 className="text-base sm:text-xl font-black text-stone-900 flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-brand-orange" />
-              Nos Nouveautés
-            </h2>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
-            {Array(4).fill(0).map((_, i) => <ProductCardSkeleton key={i} />)}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  if (!products.length) return null
-
   return (
-    <section className="py-6 sm:py-10 bg-white">
+    <section className="py-7 sm:py-10" style={{ background: 'var(--esup-cream)' }}>
       <div className="container-app">
-        <div className="flex items-center justify-between mb-3 sm:mb-6">
-          <h2 className="text-base sm:text-xl font-black text-stone-900 flex items-center gap-1.5">
-            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-brand-orange" />
+        <div className="flex items-center justify-between mb-4 sm:mb-7">
+          <h2 className="esup-font-display section-title-line text-lg sm:text-2xl font-black flex items-center gap-2"
+            style={{ color: 'var(--esup-dark)' }}>
+            <Sparkles className="h-5 w-5" style={{ color: 'var(--esup-amber)' }} />
             Nos Nouveautés
           </h2>
-          <Link to="/catalogue?sort=created_at" className="flex items-center gap-1 text-brand-orange font-semibold text-xs sm:text-sm hover:underline shrink-0">
-            Voir tout <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
+          {!isLoading && products.length > 0 && (
+            <Link to="/catalogue?sort=created_at"
+              className="esup-font-body flex items-center gap-1 text-sm font-semibold hover:underline"
+              style={{ color: 'var(--esup-amber)' }}>
+              Voir tout <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
-          {products.slice(0, 8).map((product: Product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            {Array(4).fill(0).map((_, i) => <ProductCardSkeleton key={i} />)}
+          </div>
+        ) : products.length === 0 ? null : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            {products.slice(0, 8).map((p: Product) => <ProductCard key={p.id} product={p} />)}
+          </div>
+        )}
       </div>
     </section>
   )
 }
 
 // ─────────────────────────────────────────────────────────────
-// INFOS & CONSEILS — scroll horizontal mobile
+// INFOS & CONSEILS
 // ─────────────────────────────────────────────────────────────
 const INFOS = [
-  { icon: <UtensilsCrossed className="h-5 w-5 sm:h-6 sm:w-6" />, label: 'Vos recettes',      href: '/conseils/recettes',    color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  { icon: <Users className="h-5 w-5 sm:h-6 sm:w-6" />,           label: 'Nos gagnants',       href: '/conseils/gagnants',    color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  { icon: <Heart className="h-5 w-5 sm:h-6 sm:w-6" />,           label: 'Suivis charity',     href: '/conseils/charity',     color: 'bg-green-100 text-green-700 border-green-200' },
-  { icon: <Lightbulb className="h-5 w-5 sm:h-6 sm:w-6" />,       label: 'Conseils',           href: '/conseils/nutrition',   color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { icon: <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6" />,   label: 'Suggestions',        href: '/conseils/suggestions', color: 'bg-purple-100 text-purple-700 border-purple-200' },
-  { icon: <Star className="h-5 w-5 sm:h-6 sm:w-6" />,            label: 'Partenaire',         href: '/partenaire',           color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { icon: <Sparkles className="h-5 w-5 sm:h-6 sm:w-6" />,        label: 'Une pensée',         href: '/conseils/pensee',      color: 'bg-rose-100 text-rose-700 border-rose-200' },
+  { Icon: UtensilsCrossed, label: 'Vos recettes',   href: '/conseils/recettes',    bg: '#fff7ed', fg: '#c2410c', border: '#fed7aa' },
+  { Icon: Users,           label: 'Nos gagnants',   href: '/conseils/gagnants',    bg: '#fffbeb', fg: '#b45309', border: '#fde68a' },
+  { Icon: Heart,           label: 'Suivis charity', href: '/conseils/charity',     bg: '#f0fdf4', fg: '#166534', border: '#bbf7d0' },
+  { Icon: Lightbulb,       label: 'Conseils',       href: '/conseils/nutrition',   bg: '#eff6ff', fg: '#1d4ed8', border: '#bfdbfe' },
+  { Icon: MessageSquare,   label: 'Suggestions',    href: '/conseils/suggestions', bg: '#faf5ff', fg: '#7e22ce', border: '#e9d5ff' },
+  { Icon: Award,           label: 'Partenaire',     href: '/partenaire',           bg: '#fffbeb', fg: '#d97706', border: '#fde68a' },
+  { Icon: Sparkles,        label: 'Une pensée',     href: '/conseils/pensee',      bg: '#fff1f2', fg: '#be123c', border: '#fecdd3' },
 ]
 
 function InfosConseils() {
   return (
-    <section className="py-6 sm:py-10 bg-stone-50">
+    <section className="py-7 sm:py-10 bg-white">
       <div className="container-app">
-        <div className="flex items-center justify-between mb-3 sm:mb-6">
-          <h2 className="text-base sm:text-xl font-black text-stone-900 flex items-center gap-1.5">
-            <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-brand-orange" />
+        <div className="flex items-center justify-between mb-4 sm:mb-7">
+          <h2 className="esup-font-display section-title-line text-lg sm:text-2xl font-black flex items-center gap-2"
+            style={{ color: 'var(--esup-dark)' }}>
+            <BookOpen className="h-5 w-5" style={{ color: 'var(--esup-amber)' }} />
             Infos et Conseils
           </h2>
         </div>
-        {/* Mobile scroll */}
-        <div className="flex sm:hidden gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide snap-x snap-mandatory">
-          {INFOS.map(({ icon, label, href, color }) => (
+        {/* Mobile */}
+        <div className="flex sm:hidden gap-2.5 overflow-x-auto pb-2 -mx-4 px-4 hide-scroll snap-x snap-mandatory">
+          {INFOS.map(({ Icon, label, href, bg, fg, border }) => (
             <Link key={href} to={href}>
-              <div className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 w-[62px] h-[62px] shrink-0 snap-start text-center active:scale-95 transition-all ${color}`}>
-                {icon}
-                <span className="text-[8px] font-bold leading-tight line-clamp-2">{label}</span>
+              <div className="flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl border-2 shrink-0 snap-start active:scale-95 transition-all"
+                style={{ width: 68, height: 68, background: bg, borderColor: border }}>
+                <Icon className="h-5 w-5" style={{ color: fg }} strokeWidth={2} />
+                <span className="esup-font-body text-[8px] font-bold text-center leading-tight" style={{ color: fg }}>{label}</span>
               </div>
             </Link>
           ))}
         </div>
-        {/* Desktop grid */}
-        <div className="hidden sm:grid sm:grid-cols-4 md:grid-cols-7 gap-3">
-          {INFOS.map(({ icon, label, href, color }) => (
+        {/* Desktop */}
+        <div className="hidden sm:grid grid-cols-4 md:grid-cols-7 gap-3">
+          {INFOS.map(({ Icon, label, href, bg, fg, border }) => (
             <Link key={href} to={href}>
-              <motion.div whileHover={{ scale: 1.05, y: -3 }}
-                className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 aspect-square text-center transition-all ${color}`}>
-                {icon}
-                <span className="text-xs font-bold leading-tight line-clamp-2">{label}</span>
+              <motion.div whileHover={{ scale: 1.06, y: -4 }}
+                className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 aspect-square text-center transition-all"
+                style={{ background: bg, borderColor: border }}>
+                <Icon className="h-6 w-6" style={{ color: fg }} strokeWidth={2} />
+                <span className="esup-font-body text-xs font-bold leading-tight" style={{ color: fg }}>{label}</span>
               </motion.div>
             </Link>
           ))}
@@ -820,40 +1203,57 @@ function InfosConseils() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PROGRAMME FIDÉLITÉ
+// LOYALTY BANNER
 // ─────────────────────────────────────────────────────────────
 function LoyaltyBanner() {
   const navigate = useNavigate()
+  const TIERS = [
+    { label: 'Bronze', color: '#cd7f32' },
+    { label: 'Argent', color: '#a8a9ad' },
+    { label: 'Or',     color: '#e8a010' },
+    { label: 'Platinum', color: '#e5e4e2' },
+  ]
+
   return (
-    <section className="py-6 sm:py-10 bg-white">
+    <section className="py-7 sm:py-10" style={{ background: 'var(--esup-cream)' }}>
       <div className="container-app">
-        <div className="bg-gradient-to-br from-amber-400 via-orange-500 to-red-500 rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-12 relative overflow-hidden">
-          <div className="absolute -top-8 -right-8 w-36 h-36 sm:w-52 sm:h-52 rounded-full bg-white/10" />
-          <div className="absolute -bottom-8 -left-8 w-36 h-36 sm:w-52 sm:h-52 rounded-full bg-white/10" />
-          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6">
+        <div className="relative overflow-hidden rounded-3xl shadow-xl esup-grain"
+          style={{ background: 'linear-gradient(145deg, var(--esup-dark) 0%, #3a2210 50%, var(--esup-earth) 100%)' }}>
+          {/* Decorative */}
+          <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full opacity-10"
+            style={{ background: 'radial-gradient(circle, var(--esup-amber-light) 0%, transparent 70%)' }} />
+          <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full opacity-10"
+            style={{ background: 'radial-gradient(circle, var(--esup-amber) 0%, transparent 70%)' }} />
+
+          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6 p-6 sm:p-10 md:p-14">
             <div className="text-center sm:text-left">
-              <div className="flex items-center justify-center sm:justify-start gap-1.5 mb-2">
-                <Star className="h-4 w-4 text-white fill-white" />
-                <span className="text-white font-bold text-[10px] sm:text-xs uppercase tracking-widest">Programme Fidélité</span>
+              <div className="flex items-center justify-center sm:justify-start gap-2 mb-3">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(232,130,12,0.2)' }}>
+                  <Star className="h-4 w-4 fill-current" style={{ color: 'var(--esup-amber)' }} />
+                </div>
+                <span className="esup-font-body font-bold text-xs uppercase tracking-widest" style={{ color: 'var(--esup-amber)' }}>
+                  Programme Fidélité
+                </span>
               </div>
-              <h2 className="text-xl sm:text-3xl font-black text-white leading-tight">
-                Gagnez des points à chaque achat
+              <h2 className="esup-font-display text-xl sm:text-3xl font-black text-white leading-tight">
+                Gagnez des points<br />à chaque achat
               </h2>
-              <p className="mt-1.5 text-white/90 text-xs sm:text-base">
+              <p className="esup-font-body mt-2 text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>
                 1 point par 100 FCFA · Niveau Platinum = ×3
               </p>
-              <div className="mt-3 flex flex-wrap gap-1.5 sm:gap-2 justify-center sm:justify-start">
-                {['Bronze', 'Argent', 'Or', 'Platinum'].map(l => (
-                  <span key={l} className="flex items-center gap-1 bg-white/20 text-white text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full">
-                    <Trophy className="h-2.5 w-2.5" />{l}
+              <div className="mt-4 flex flex-wrap gap-2 justify-center sm:justify-start">
+                {TIERS.map(t => (
+                  <span key={t.label} className="esup-font-body flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full"
+                    style={{ background: 'rgba(255,255,255,0.08)', color: t.color, border: `1px solid ${t.color}40` }}>
+                    <Trophy className="h-3 w-3" style={{ color: t.color }} />
+                    {t.label}
                   </span>
                 ))}
               </div>
             </div>
-            <button
-              onClick={() => navigate('/register')}
-              className="flex items-center justify-center gap-2 bg-white text-stone-900 font-bold text-sm sm:text-base px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl shadow-xl hover:bg-stone-100 transition-colors shrink-0 w-full sm:w-auto"
-            >
+            <button onClick={() => navigate('/register')}
+              className="esup-font-body flex items-center gap-2 font-bold text-sm sm:text-base px-7 py-3.5 rounded-2xl shadow-2xl transition-all hover:scale-105 active:scale-95 shrink-0 w-full sm:w-auto justify-center"
+              style={{ background: 'var(--esup-amber)', color: 'white' }}>
               Rejoindre e-Sup'M <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -868,7 +1268,8 @@ function LoyaltyBanner() {
 // ─────────────────────────────────────────────────────────────
 export default function HomePage() {
   return (
-    <div className="bg-stone-50">
+    <div className="esup-font-body" style={{ background: 'var(--esup-cream)' }}>
+      <style dangerouslySetInnerHTML={{ __html: GLOBAL_STYLES }} />
       <SearchBar />
       <HeroBanner />
       <RayonsSection />

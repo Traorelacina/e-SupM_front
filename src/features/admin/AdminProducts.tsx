@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Package,
@@ -32,11 +32,15 @@ import {
   FileText,
   LayoutGrid,
   Tag,
+  ShoppingBag,
+  Clock,        // AJOUTÉ — icône date expiration
+  Calendar,     // AJOUTÉ — filtre expiration
 } from 'lucide-react';
 import { adminApi, categoryApi, storageUrl } from '@/api';
 import type { Product, Category, PaginatedResponse } from '@/api';
 import ProductForm from './ProductForm';
 import ProductCategoryManager from './CategoryManager';
+import FoodBoxManager from './FoodBoxManager';
 import { StockModal, LabelModal, ImportModal } from './ProductModals';
 
 // ── Flatten helper ─────────────────────────────────────────────────
@@ -72,49 +76,100 @@ function useToast() {
 
 // ── Label config ───────────────────────────────────────────────────
 const LABEL_COLORS: Record<string, string> = {
-  stock_limite: '#f59e0b',
-  promo: '#16a34a',
-  stock_epuise: '#dc2626',
+  stock_limite:  '#f59e0b',
+  promo:         '#16a34a',
+  stock_epuise:  '#dc2626',
   offre_limitee: '#8b5cf6',
-  vote_rayon: '#2563eb',
+  vote_rayon:    '#2563eb',
 };
 
 const LABEL_NAMES: Record<string, string> = {
-  stock_limite: 'Stock limité',
-  promo: 'Promotion',
-  stock_epuise: 'Stock épuisé',
+  stock_limite:  'Stock limité',
+  promo:         'Promotion',
+  stock_epuise:  'Stock épuisé',
   offre_limitee: 'Offre limitée',
-  vote_rayon: 'Vote du rayon',
+  vote_rayon:    'Vote du rayon',
 };
 
 const ATTR_ICONS: Record<string, React.ElementType> = {
-  is_bio: Leaf,
-  is_local: MapPin,
-  is_eco: Recycle,
-  is_vegan: Sprout,
-  is_gluten_free: Wheat,
-  is_premium: Star,
-  is_featured: Heart,
-  is_new: Sparkles,
+  is_bio:        Leaf,
+  is_local:      MapPin,
+  is_eco:        Recycle,
+  is_vegan:      Sprout,
+  is_gluten_free:Wheat,
+  is_premium:    Star,
+  is_featured:   Heart,
+  is_new:        Sparkles,
 };
 
 const ATTR_LABELS: Record<string, string> = {
-  is_bio: 'Bio',
-  is_local: 'Local',
-  is_eco: 'Éco',
-  is_vegan: 'Vegan',
-  is_gluten_free: 'Sans gluten',
-  is_premium: 'Premium',
-  is_featured: 'Coup de cœur',
-  is_new: 'Nouveau',
+  is_bio:        'Bio',
+  is_local:      'Local',
+  is_eco:        'Éco',
+  is_vegan:      'Vegan',
+  is_gluten_free:'Sans gluten',
+  is_premium:    'Premium',
+  is_featured:   'Coup de cœur',
+  is_new:        'Nouveau',
 };
+
+// ── Expiry helpers — même logique que CataloguePage ───────────────
+/**
+ * Retourne le nombre de jours restants avant expiration.
+ * 0  = expire aujourd'hui ou déjà expiré
+ * null = pas de date renseignée
+ */
+function getDaysUntilExpiry(prod: any): number | null {
+  const raw = prod.expiry_date ?? prod.days_until_expiry;
+  if (!raw) return null;
+
+  // Si c'est déjà un nombre (calculé par le backend)
+  if (typeof raw === 'number') return Math.max(0, Math.round(raw));
+
+  // Sinon c'est une date ISO
+  const diffMs = new Date(raw).getTime() - Date.now();
+  return diffMs <= 0 ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Retourne le badge coloré selon l'urgence :
+ * Rouge  → 0-3 jours
+ * Orange → 4-7 jours
+ * Jaune  → 8+ jours
+ * null   → pas de date
+ */
+function getExpiryBadge(prod: any): {
+  label: string;
+  bg: string;
+  color: string;
+  border: string;
+  icon: 'red' | 'orange' | 'yellow';
+} | null {
+  const days = getDaysUntilExpiry(prod);
+  if (days === null) return null;
+
+  if (days === 0)
+    return { label: "Auj.", bg: '#fef2f2', color: '#dc2626', border: '#fecaca', icon: 'red' };
+  if (days <= 3)
+    return { label: `J+${days}`, bg: '#fef2f2', color: '#dc2626', border: '#fecaca', icon: 'red' };
+  if (days <= 7)
+    return { label: `J+${days}`, bg: '#fff7ed', color: '#c2410c', border: '#fed7aa', icon: 'orange' };
+  return   { label: `J+${days}`, bg: '#fffbeb', color: '#92400e', border: '#fde68a', icon: 'yellow' };
+}
+
+/** Compte les produits qui expirent dans les 7 prochains jours */
+function countExpiringSoon(data: Product[]): number {
+  return data.filter((p) => {
+    const days = getDaysUntilExpiry(p);
+    return days !== null && days <= 7;
+  }).length;
+}
 
 // ── Helper URL image produit ───────────────────────────────────────
 function getProductThumb(prod: any): string | null {
   const primary = prod.primary_image ?? prod.images?.find((img: any) => img.is_primary);
-  const first = prod.images?.[0];
-  const img = primary ?? first;
-
+  const first   = prod.images?.[0];
+  const img     = primary ?? first;
   if (!img) return null;
   if (img.url && (img.url.startsWith('http') || img.url.startsWith('/'))) return img.url;
   if (img.path) return storageUrl(img.path);
@@ -125,7 +180,7 @@ function getProductThumb(prod: any): string | null {
 function SkeletonRow() {
   return (
     <tr>
-      {[...Array(9)].map((_, i) => (
+      {[...Array(10)].map((_, i) => (
         <td key={i} className="py-3 px-4">
           <div className="h-9 bg-stone-100 rounded-xl animate-pulse" />
         </td>
@@ -137,29 +192,34 @@ function SkeletonRow() {
 // ── Main component ─────────────────────────────────────────────────
 export default function AdminProducts() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'products' | 'categories'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'foodboxes'>('products');
 
   // Data
-  const [products, setProducts] = useState<(PaginatedResponse<Product> & { low_stock_count?: number; out_of_stock_count?: number }) | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<(PaginatedResponse<Product> & {
+    low_stock_count?:     number;
+    out_of_stock_count?:  number;
+    expiring_soon_count?: number;
+  }) | null>(null);
+  const [loading,    setLoading]    = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const flatCats = flattenCategories(categories);
 
   // Filters
-  const [search, setSearch] = useState('');
-  const [filterCat, setFilterCat] = useState(searchParams.get('category_id') ?? '');
-  const [filterStatus, setFilterStatus] = useState(searchParams.get('status') ?? '');
-  const [filterLowStock, setFilterLow] = useState(searchParams.get('low_stock') === 'true');
-  const [filterOutStock, setFilterOut] = useState(searchParams.get('out_of_stock') === 'true');
+  const [search,           setSearch]       = useState('');
+  const [filterCat,        setFilterCat]    = useState(searchParams.get('category_id') ?? '');
+  const [filterStatus,     setFilterStatus] = useState(searchParams.get('status') ?? '');
+  const [filterLowStock,   setFilterLow]    = useState(searchParams.get('low_stock') === 'true');
+  const [filterOutStock,   setFilterOut]    = useState(searchParams.get('out_of_stock') === 'true');
+  const [filterExpiringSoon, setFilterExp]  = useState(searchParams.get('expiring_soon') === 'true'); // NOUVEAU
   const [page, setPage] = useState(1);
 
   // Modals
-  const [modal, setModal] = useState<'create' | 'edit' | 'stock' | 'label' | 'import' | null>(null);
+  const [modal,    setModal]    = useState<'create' | 'edit' | 'stock' | 'label' | 'import' | null>(null);
   const [selected, setSelected] = useState<Product | null>(null);
 
   // Action loading states
-  const [togglingId, setTogglingId] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [togglingId,    setTogglingId]    = useState<number | null>(null);
+  const [deletingId,    setDeletingId]    = useState<number | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
 
   const { toasts, toast } = useToast();
@@ -169,11 +229,12 @@ export default function AdminProducts() {
     setLoading(true);
     try {
       const params: Record<string, any> = { page };
-      if (search) params.q = search;
-      if (filterCat) params.category_id = filterCat;
-      if (filterStatus) params.status = filterStatus;
-      if (filterLowStock) params.low_stock = 'true';
-      if (filterOutStock) params.out_of_stock = 'true';
+      if (search)             params.q              = search;
+      if (filterCat)          params.category_id    = filterCat;
+      if (filterStatus)       params.status         = filterStatus;
+      if (filterLowStock)     params.low_stock      = 'true';
+      if (filterOutStock)     params.out_of_stock   = 'true';
+      if (filterExpiringSoon) params.expiring_soon  = 'true'; // NOUVEAU
 
       const res = await adminApi.products.list(params);
 
@@ -192,11 +253,11 @@ export default function AdminProducts() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, filterCat, filterStatus, filterLowStock, filterOutStock, toast]);
+  }, [page, search, filterCat, filterStatus, filterLowStock, filterOutStock, filterExpiringSoon, toast]);
 
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await categoryApi.tree();
+      const res  = await categoryApi.tree();
       const list = Array.isArray(res) ? res : (res as any).data ?? [];
       setCategories(list);
     } catch (err) {
@@ -205,36 +266,28 @@ export default function AdminProducts() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+  useState(() => { fetchCategories(); });
 
-  useEffect(() => {
+  useState(() => {
     if (activeTab === 'products') fetchProducts();
-  }, [fetchProducts, activeTab]);
+  });
 
   // ── Actions ────────────────────────────────────────────────────
   const handleToggle = async (product: Product) => {
     setTogglingId(product.id);
     try {
       const response = await adminApi.products.toggle(product.id);
-
       setProducts((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           data: prev.data.map((p) =>
             p.id === product.id
-              ? {
-                  ...p,
-                  is_active: response.is_active ?? !(p as any).is_active,
-                  is_draft: response.is_active ? false : (p as any).is_draft
-                }
+              ? { ...p, is_active: response.is_active ?? !(p as any).is_active, is_draft: response.is_active ? false : (p as any).is_draft }
               : p
           ),
         };
       });
-
       toast(response.is_active ? 'Produit activé' : 'Produit désactivé');
     } catch (e: any) {
       toast(e.message || 'Erreur lors du changement de statut', 'error');
@@ -280,99 +333,85 @@ export default function AdminProducts() {
     setFilterStatus('');
     setFilterLow(false);
     setFilterOut(false);
+    setFilterExp(false); // NOUVEAU
     setPage(1);
     setSearchParams({});
   };
 
-  const hasFilters = search || filterCat || filterStatus || filterLowStock || filterOutStock;
+  const hasFilters = search || filterCat || filterStatus || filterLowStock || filterOutStock || filterExpiringSoon;
 
   const fmt = (n: number) =>
     new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n) + ' F';
 
   const productList: Product[] = products?.data ?? [];
 
+  // Compte local des produits expirant bientôt (fallback si le backend ne renvoie pas expiring_soon_count)
+  const localExpiringSoonCount = products
+    ? (products.expiring_soon_count ?? countExpiringSoon(productList))
+    : 0;
+
   const getDisplayStatus = (prod: any) => {
-    if (prod.is_draft) return { text: 'Brouillon', isActive: false, icon: EyeOff };
-    if (prod.is_active) return { text: 'Actif', isActive: true, icon: Eye };
-    return { text: 'Inactif', isActive: false, icon: EyeOff };
+    if (prod.is_draft)  return { text: 'Brouillon', isActive: false, icon: EyeOff };
+    if (prod.is_active) return { text: 'Actif',     isActive: true,  icon: Eye   };
+    return                     { text: 'Inactif',   isActive: false, icon: EyeOff };
   };
 
   return (
     <div className="min-h-full bg-stone-50">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="bg-white border-b border-stone-100 px-4 sm:px-6 py-4">
         <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-lg sm:text-xl font-bold text-stone-900">Catalogue</h1>
-            <p className="text-stone-500 text-sm mt-0.5">Gestion des produits et des catégories</p>
+            <p className="text-stone-500 text-sm mt-0.5">Gestion des produits, catégories et boxes alimentaires</p>
           </div>
           {activeTab === 'products' && (
             <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={() => setModal('import')}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-stone-200 text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-colors"
-              >
-                <Upload size={15} />
-                <span className="hidden sm:inline">Importer</span>
+              <button onClick={() => setModal('import')}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-stone-200 text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-colors">
+                <Upload size={15} /><span className="hidden sm:inline">Importer</span>
               </button>
-              <button
-                onClick={() => adminApi.products.export()}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-stone-200 text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-colors"
-              >
-                <Download size={15} />
-                <span className="hidden sm:inline">Exporter</span>
+              <button onClick={() => adminApi.products.export()}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-stone-200 text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-colors">
+                <Download size={15} /><span className="hidden sm:inline">Exporter</span>
               </button>
-              <button
-                onClick={() => {
-                  setSelected(null);
-                  setModal('create');
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 text-stone-900 text-sm font-semibold transition-colors"
-              >
+              <button onClick={() => { setSelected(null); setModal('create'); }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 text-stone-900 text-sm font-semibold transition-colors">
                 <Plus size={15} /> Nouveau produit
               </button>
             </div>
           )}
         </div>
 
-        {/* Tab switcher */}
+        {/* Tabs */}
         <div className="flex gap-1 mt-4">
-          <button
-            onClick={() => setActiveTab('products')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-              activeTab === 'products'
-                ? 'bg-amber-400 text-stone-900 shadow-sm'
-                : 'text-stone-500 hover:bg-stone-100'
-            }`}
-          >
-            <Package size={15} /> Produits
-          </button>
-          <button
-            onClick={() => setActiveTab('categories')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-              activeTab === 'categories'
-                ? 'bg-amber-400 text-stone-900 shadow-sm'
-                : 'text-stone-500 hover:bg-stone-100'
-            }`}
-          >
-            <Tag size={15} /> Catégories
-          </button>
+          {[
+            { key: 'products',   label: 'Produits',            icon: Package    },
+            { key: 'categories', label: 'Catégories',          icon: Tag        },
+            { key: 'foodboxes',  label: 'Boxes alimentaires',  icon: ShoppingBag },
+          ].map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => setActiveTab(key as any)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === key ? 'bg-amber-400 text-stone-900 shadow-sm' : 'text-stone-500 hover:bg-stone-100'
+              }`}>
+              <Icon size={15} /> {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Products tab */}
+      {/* ── Products tab ── */}
       {activeTab === 'products' && (
         <div className="p-4 sm:p-6 space-y-4">
+
           {/* Statistiques */}
           {products && (
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 rounded-2xl p-4 border border-amber-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-amber-600">Total produits</p>
-                    <p className="text-2xl font-display font-bold text-amber-900 mt-1">
-                      {products.total?.toLocaleString() || 0}
-                    </p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-amber-600">Total</p>
+                    <p className="text-2xl font-bold text-amber-900 mt-1">{products.total?.toLocaleString() || 0}</p>
                   </div>
                   <div className="w-10 h-10 bg-amber-200 rounded-xl flex items-center justify-center">
                     <LayoutGrid size={20} className="text-amber-700" />
@@ -384,8 +423,8 @@ export default function AdminProducts() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-green-600">Actifs</p>
-                    <p className="text-2xl font-display font-bold text-green-900 mt-1">
-                      {products.data?.filter((p: any) => p.is_active && !p.is_draft).length || 0}
+                    <p className="text-2xl font-bold text-green-900 mt-1">
+                      {productList.filter((p: any) => p.is_active && !p.is_draft).length}
                     </p>
                   </div>
                   <div className="w-10 h-10 bg-green-200 rounded-xl flex items-center justify-center">
@@ -398,8 +437,8 @@ export default function AdminProducts() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-orange-600">Brouillons</p>
-                    <p className="text-2xl font-display font-bold text-orange-900 mt-1">
-                      {products.data?.filter((p: any) => p.is_draft).length || 0}
+                    <p className="text-2xl font-bold text-orange-900 mt-1">
+                      {productList.filter((p: any) => p.is_draft).length}
                     </p>
                   </div>
                   <div className="w-10 h-10 bg-orange-200 rounded-xl flex items-center justify-center">
@@ -412,8 +451,8 @@ export default function AdminProducts() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-stone-500">Inactifs</p>
-                    <p className="text-2xl font-display font-bold text-stone-700 mt-1">
-                      {products.data?.filter((p: any) => !p.is_active && !p.is_draft).length || 0}
+                    <p className="text-2xl font-bold text-stone-700 mt-1">
+                      {productList.filter((p: any) => !p.is_active && !p.is_draft).length}
                     </p>
                   </div>
                   <div className="w-10 h-10 bg-stone-200 rounded-xl flex items-center justify-center">
@@ -424,12 +463,12 @@ export default function AdminProducts() {
             </div>
           )}
 
-          {/* Alertes stock */}
-          {products && ((products.low_stock_count ?? 0) > 0 || (products.out_of_stock_count ?? 0) > 0) && (
+          {/* ── Alertes stock + expiration ── */}
+          {products && (
             <div className="flex flex-wrap gap-3">
               {(products.low_stock_count ?? 0) > 0 && (
                 <button
-                  onClick={() => { setFilterLow(true); setFilterOut(false); }}
+                  onClick={() => { setFilterLow(true); setFilterOut(false); setFilterExp(false); }}
                   className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-100 transition-colors"
                 >
                   <AlertTriangle size={15} />
@@ -438,17 +477,33 @@ export default function AdminProducts() {
               )}
               {(products.out_of_stock_count ?? 0) > 0 && (
                 <button
-                  onClick={() => { setFilterOut(true); setFilterLow(false); }}
+                  onClick={() => { setFilterOut(true); setFilterLow(false); setFilterExp(false); }}
                   className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors"
                 >
                   <AlertCircle size={15} />
                   {products.out_of_stock_count} en rupture
                 </button>
               )}
+
+              {/* NOUVEAU — Alerte expiration */}
+              {localExpiringSoonCount > 0 && (
+                <button
+                  onClick={() => { setFilterExp(true); setFilterLow(false); setFilterOut(false); }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-colors"
+                  style={{
+                    background:   filterExpiringSoon ? '#dc2626' : '#fef2f2',
+                    borderColor:  '#fecaca',
+                    color:        filterExpiringSoon ? 'white' : '#dc2626',
+                  }}
+                >
+                  <Clock size={15} />
+                  {localExpiringSoonCount} expire{localExpiringSoonCount > 1 ? 'nt' : ''} bientôt
+                </button>
+              )}
             </div>
           )}
 
-          {/* Toolbar */}
+          {/* ── Toolbar ── */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -485,6 +540,7 @@ export default function AdminProducts() {
               <option value="draft">Brouillons</option>
             </select>
 
+            {/* Chips filtres actifs */}
             {filterLowStock && (
               <span className="flex items-center gap-1.5 bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1.5 rounded-full">
                 <Zap size={11} /> Stock faible
@@ -497,35 +553,42 @@ export default function AdminProducts() {
                 <button onClick={() => setFilterOut(false)} className="ml-1"><X size={11} /></button>
               </span>
             )}
+            {/* NOUVEAU chip expiration */}
+            {filterExpiringSoon && (
+              <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-full"
+                style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+                <Clock size={11} /> Expire bientôt
+                <button onClick={() => setFilterExp(false)} className="ml-1"><X size={11} /></button>
+              </span>
+            )}
 
             {hasFilters && (
-              <button
-                onClick={clearFilters}
-                className="text-xs text-stone-400 hover:text-red-500 font-semibold px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1"
-              >
+              <button onClick={clearFilters}
+                className="text-xs text-stone-400 hover:text-red-500 font-semibold px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1">
                 <X size={11} /> Réinitialiser
               </button>
             )}
 
-            <button
-              onClick={fetchProducts}
-              disabled={loading}
+            <button onClick={fetchProducts} disabled={loading}
               className="ml-auto p-2.5 rounded-xl hover:bg-stone-100 text-stone-500 transition-colors disabled:opacity-50"
-              title="Actualiser"
-            >
+              title="Actualiser">
               <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
             </button>
           </div>
 
-          {/* Table */}
+          {/* ── Table ── */}
           <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto overscroll-x-contain">
-              <table className="w-full border-collapse min-w-[900px]">
+              <table className="w-full border-collapse min-w-[1020px]">
                 <thead className="bg-stone-50 border-b border-stone-100">
                   <tr>
-                    {/* ↓ Colonne Catégorie ajoutée juste après Rayon */}
-                    {['Produit', 'Rayon', 'Catégorie', 'Prix', 'Stock', 'Label', 'Attrs', 'Statut', ''].map((h) => (
-                      <th key={h} className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider text-stone-400 whitespace-nowrap">{h}</th>
+                    {/* NOUVEAU — 'Expire' ajouté entre Stock et Label */}
+                    {['Produit', 'Rayon', 'Catégorie', 'Prix', 'Stock', 'Expire', 'Label', 'Attrs', 'Statut', ''].map((h) => (
+                      <th key={h} className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider text-stone-400 whitespace-nowrap">
+                        {h === 'Expire'
+                          ? <span className="flex items-center gap-1"><Clock size={11} /> Expire</span>
+                          : h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -533,26 +596,41 @@ export default function AdminProducts() {
                   {loading ? (
                     [...Array(6)].map((_, i) => <SkeletonRow key={i} />)
                   ) : productList.length === 0 ? (
-                    <tr><td colSpan={9} className="py-16 text-center text-stone-400 text-sm">
+                    <tr><td colSpan={10} className="py-16 text-center text-stone-400 text-sm">
                       Aucun produit trouvé
-                      {hasFilters && <button onClick={clearFilters} className="ml-2 text-amber-600 font-semibold underline">Réinitialiser les filtres</button>}
+                      {hasFilters && (
+                        <button onClick={clearFilters} className="ml-2 text-amber-600 font-semibold underline">
+                          Réinitialiser les filtres
+                        </button>
+                      )}
                     </td></tr>
                   ) : (
                     productList.map((prod: any) => {
-                      const thumbUrl = getProductThumb(prod);
-                      const isToggling = togglingId === prod.id;
-                      const isDeleting = deletingId === prod.id;
+                      const thumbUrl      = getProductThumb(prod);
+                      const isToggling    = togglingId    === prod.id;
+                      const isDeleting    = deletingId    === prod.id;
                       const isDuplicating = duplicatingId === prod.id;
-                      const status = getDisplayStatus(prod);
-                      const StatusIcon = status.icon;
+                      const status        = getDisplayStatus(prod);
+                      const StatusIcon    = status.icon;
+
+                      // NOUVEAU — badge expiration
+                      const expiryBadge   = getExpiryBadge(prod);
+                      const expiryDate    = prod.expiry_date
+                        ? new Date(prod.expiry_date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                        : null;
 
                       return (
-                        <tr key={prod.id} className="hover:bg-stone-50/80 transition-colors">
+                        <tr key={prod.id}
+                          className={`hover:bg-stone-50/80 transition-colors ${
+                            expiryBadge?.icon === 'red' ? 'bg-red-50/30' : ''
+                          }`}>
+
                           {/* Produit */}
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-3 min-w-[180px]">
                               {thumbUrl ? (
-                                <img src={thumbUrl} alt={prod.name} className="w-10 h-10 rounded-xl object-cover border border-stone-200 flex-shrink-0" />
+                                <img src={thumbUrl} alt={prod.name}
+                                  className="w-10 h-10 rounded-xl object-cover border border-stone-200 flex-shrink-0" />
                               ) : (
                                 <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center flex-shrink-0">
                                   <Package size={18} className="text-stone-400" />
@@ -579,23 +657,19 @@ export default function AdminProducts() {
                             </span>
                           </td>
 
-                          {/* ↓ Catégorie de produit — nouvelle colonne */}
+                          {/* Catégorie de produit */}
                           <td className="py-3 px-4">
                             {prod.product_category ? (
                               <span
                                 className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap"
                                 style={{
-                                  backgroundColor: prod.product_category.color
-                                    ? `${prod.product_category.color}20`
-                                    : '#fef3c720',
-                                  color: prod.product_category.color || '#92400e',
-                                  border: `1px solid ${prod.product_category.color || '#fbbf24'}`,
+                                  backgroundColor: prod.product_category.color ? `${prod.product_category.color}20` : '#fef3c720',
+                                  color:           prod.product_category.color || '#92400e',
+                                  border:          `1px solid ${prod.product_category.color || '#fbbf24'}`,
                                 }}
                               >
-                                <div
-                                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                  style={{ backgroundColor: prod.product_category.color || '#fbbf24' }}
-                                />
+                                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: prod.product_category.color || '#fbbf24' }} />
                                 {prod.product_category.name}
                               </span>
                             ) : (
@@ -606,34 +680,93 @@ export default function AdminProducts() {
                           {/* Prix */}
                           <td className="py-3 px-4 whitespace-nowrap">
                             <p className="text-sm font-bold text-stone-900">{fmt(prod.price)}</p>
-                            {prod.compare_price && <p className="text-xs text-stone-400 line-through">{fmt(prod.compare_price)}</p>}
+                            {prod.compare_price && (
+                              <p className="text-xs text-stone-400 line-through">{fmt(prod.compare_price)}</p>
+                            )}
                           </td>
 
                           {/* Stock */}
                           <td className="py-3 px-4">
-                            <button onClick={() => { setSelected(prod); setModal('stock'); }} className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-full border transition-all ${prod.stock === 0 ? 'bg-red-50 border-red-200 text-red-600' : prod.stock <= (prod.low_stock_threshold ?? 5) ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
-                              {prod.stock === 0 ? <AlertCircle size={11} /> : prod.stock <= (prod.low_stock_threshold ?? 5) ? <Zap size={11} /> : null}
+                            <button
+                              onClick={() => { setSelected(prod); setModal('stock'); }}
+                              className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-full border transition-all ${
+                                prod.stock === 0
+                                  ? 'bg-red-50 border-red-200 text-red-600'
+                                  : prod.stock <= (prod.low_stock_threshold ?? 5)
+                                  ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                  : 'bg-green-50 border-green-200 text-green-700'
+                              }`}>
+                              {prod.stock === 0
+                                ? <AlertCircle size={11} />
+                                : prod.stock <= (prod.low_stock_threshold ?? 5)
+                                ? <Zap size={11} />
+                                : null}
                               {prod.stock}
                             </button>
                           </td>
 
+                          {/* ── NOUVEAU — Colonne Expire ── */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {expiryBadge ? (
+                              <div className="flex flex-col gap-1">
+                                {/* Badge urgence coloré */}
+                                <span
+                                  className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full"
+                                  style={{
+                                    background:  expiryBadge.bg,
+                                    color:       expiryBadge.color,
+                                    border:      `1px solid ${expiryBadge.border}`,
+                                  }}
+                                >
+                                  <Clock size={9} />
+                                  {expiryBadge.label}
+                                </span>
+                                {/* Date lisible en dessous */}
+                                {expiryDate && (
+                                  <span className="text-[10px] text-stone-400 font-mono">{expiryDate}</span>
+                                )}
+                              </div>
+                            ) : expiryDate ? (
+                              // Date future lointaine : affichage simple sans badge d'urgence
+                              <span className="text-xs text-stone-400 font-mono">{expiryDate}</span>
+                            ) : (
+                              <span className="text-xs text-stone-200">—</span>
+                            )}
+                          </td>
+
                           {/* Label */}
                           <td className="py-3 px-4">
-                            <button onClick={() => { setSelected(prod); setModal('label'); }} className="text-xs font-bold px-2.5 py-1 rounded-full border hover:opacity-80" style={prod.admin_label && prod.admin_label !== 'none' ? { borderColor: LABEL_COLORS[prod.admin_label], color: LABEL_COLORS[prod.admin_label], background: `${LABEL_COLORS[prod.admin_label]}18` } : { borderColor: '#e2e8f0', color: '#94a3b8' }}>
-                              {prod.admin_label && prod.admin_label !== 'none' ? LABEL_NAMES[prod.admin_label] ?? prod.admin_label.replace(/_/g, ' ') : '—'}
+                            <button
+                              onClick={() => { setSelected(prod); setModal('label'); }}
+                              className="text-xs font-bold px-2.5 py-1 rounded-full border hover:opacity-80"
+                              style={prod.admin_label && prod.admin_label !== 'none'
+                                ? { borderColor: LABEL_COLORS[prod.admin_label], color: LABEL_COLORS[prod.admin_label], background: `${LABEL_COLORS[prod.admin_label]}18` }
+                                : { borderColor: '#e2e8f0', color: '#94a3b8' }}>
+                              {prod.admin_label && prod.admin_label !== 'none'
+                                ? LABEL_NAMES[prod.admin_label] ?? prod.admin_label.replace(/_/g, ' ')
+                                : '—'}
                             </button>
                           </td>
 
                           {/* Attrs */}
                           <td className="py-3 px-4">
                             <div className="flex flex-wrap gap-1 max-w-[70px]">
-                              {Object.entries(ATTR_ICONS).map(([k, Icon]) => prod[k] ? <Icon key={k} size={13} className="text-stone-500" title={ATTR_LABELS[k]} /> : null)}
+                              {Object.entries(ATTR_ICONS).map(([k, Icon]) =>
+                                prod[k] ? <Icon key={k} size={13} className="text-stone-500" title={ATTR_LABELS[k]} /> : null
+                              )}
                             </div>
                           </td>
 
                           {/* Statut */}
                           <td className="py-3 px-4">
-                            <button onClick={() => handleToggle(prod)} disabled={isToggling} className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border transition-all ${status.isActive ? 'bg-green-50 border-green-300 text-green-700' : 'bg-stone-50 border-stone-200 text-stone-500'}`}>
+                            <button
+                              onClick={() => handleToggle(prod)}
+                              disabled={isToggling}
+                              className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border transition-all ${
+                                status.isActive
+                                  ? 'bg-green-50 border-green-300 text-green-700'
+                                  : 'bg-stone-50 border-stone-200 text-stone-500'
+                              }`}>
                               {isToggling ? <RefreshCw size={11} className="animate-spin" /> : <StatusIcon size={11} />}
                               {status.text}
                             </button>
@@ -642,9 +775,18 @@ export default function AdminProducts() {
                           {/* Actions */}
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-0.5">
-                              <button onClick={() => { setSelected(prod); setModal('edit'); }} className="p-2 rounded-lg hover:bg-stone-100 text-stone-500"><Edit2 size={14} /></button>
-                              <button onClick={() => handleDuplicate(prod.id)} disabled={isDuplicating} className="p-2 rounded-lg hover:bg-stone-100 text-stone-500">{isDuplicating ? <RefreshCw size={14} className="animate-spin" /> : <Copy size={14} />}</button>
-                              <button onClick={() => handleDelete(prod)} disabled={isDeleting} className="p-2 rounded-lg hover:bg-red-50 text-stone-400 hover:text-red-600">{isDeleting ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}</button>
+                              <button onClick={() => { setSelected(prod); setModal('edit'); }}
+                                className="p-2 rounded-lg hover:bg-stone-100 text-stone-500">
+                                <Edit2 size={14} />
+                              </button>
+                              <button onClick={() => handleDuplicate(prod.id)} disabled={isDuplicating}
+                                className="p-2 rounded-lg hover:bg-stone-100 text-stone-500">
+                                {isDuplicating ? <RefreshCw size={14} className="animate-spin" /> : <Copy size={14} />}
+                              </button>
+                              <button onClick={() => handleDelete(prod)} disabled={isDeleting}
+                                className="p-2 rounded-lg hover:bg-red-50 text-stone-400 hover:text-red-600">
+                                {isDeleting ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -659,11 +801,20 @@ export default function AdminProducts() {
           {/* Pagination */}
           {products && products.last_page > 1 && (
             <div className="flex items-center justify-center gap-4 pt-2">
-              <button disabled={products.current_page === 1} onClick={() => setPage(p => p - 1)} className="flex items-center gap-1 px-4 py-2 rounded-xl border border-stone-200 text-sm font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-40">
+              <button
+                disabled={products.current_page === 1}
+                onClick={() => setPage(p => p - 1)}
+                className="flex items-center gap-1 px-4 py-2 rounded-xl border border-stone-200 text-sm font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-40">
                 <ChevronLeft size={15} /> Précédent
               </button>
-              <span className="text-sm font-medium text-stone-600">Page {products.current_page} / {products.last_page} <span className="text-stone-400 ml-1.5">({products.total} résultats)</span></span>
-              <button disabled={products.current_page === products.last_page} onClick={() => setPage(p => p + 1)} className="flex items-center gap-1 px-4 py-2 rounded-xl border border-stone-200 text-sm font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-40">
+              <span className="text-sm font-medium text-stone-600">
+                Page {products.current_page} / {products.last_page}
+                <span className="text-stone-400 ml-1.5">({products.total} résultats)</span>
+              </span>
+              <button
+                disabled={products.current_page === products.last_page}
+                onClick={() => setPage(p => p + 1)}
+                className="flex items-center gap-1 px-4 py-2 rounded-xl border border-stone-200 text-sm font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-40">
                 Suivant <ChevronRight size={15} />
               </button>
             </div>
@@ -672,9 +823,10 @@ export default function AdminProducts() {
       )}
 
       {/* Categories tab */}
-      {activeTab === 'categories' && (
-        <ProductCategoryManager onToast={toast} />
-      )}
+      {activeTab === 'categories' && <ProductCategoryManager onToast={toast} />}
+
+      {/* Food Boxes tab */}
+      {activeTab === 'foodboxes'  && <FoodBoxManager onToast={toast} />}
 
       {/* Modals */}
       {(modal === 'create' || modal === 'edit') && (
@@ -686,32 +838,22 @@ export default function AdminProducts() {
           onToast={toast}
         />
       )}
-      {modal === 'stock' && selected && (
-        <StockModal product={selected} onClose={() => setModal(null)} onDone={fetchProducts} onToast={toast} />
-      )}
-      {modal === 'label' && selected && (
-        <LabelModal product={selected} onClose={() => setModal(null)} onDone={fetchProducts} onToast={toast} />
-      )}
-      {modal === 'import' && (
-        <ImportModal onClose={() => setModal(null)} onDone={fetchProducts} onToast={toast} />
-      )}
+      {modal === 'stock'  && selected && <StockModal  product={selected} onClose={() => setModal(null)} onDone={fetchProducts} onToast={toast} />}
+      {modal === 'label'  && selected && <LabelModal  product={selected} onClose={() => setModal(null)} onDone={fetchProducts} onToast={toast} />}
+      {modal === 'import' && <ImportModal onClose={() => setModal(null)} onDone={fetchProducts} onToast={toast} />}
 
       {/* Toasts */}
       <div className="fixed bottom-5 right-4 sm:right-5 flex flex-col gap-2 z-[200] max-w-[320px] w-full pointer-events-none">
         {toasts.map(t => (
-          <div key={t.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold w-full pointer-events-auto ${t.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white border-green-200 text-green-700'}`}>
+          <div key={t.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold w-full pointer-events-auto ${
+              t.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white border-green-200 text-green-700'
+            }`}>
             {t.type === 'error' ? <AlertCircle size={15} /> : <CheckCircle size={15} />}
             <span>{t.msg}</span>
           </div>
         ))}
       </div>
-
-      <style>{`
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }

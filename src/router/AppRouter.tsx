@@ -17,6 +17,8 @@ const ProfilePage       = lazy(() => import('@/features/profile/ProfilePage'))
 const LoyaltyPage       = lazy(() => import('@/features/loyalty/LoyaltyPage'))
 const GamesPage         = lazy(() => import('@/features/games/GamesPage'))
 const SubscriptionsPage = lazy(() => import('@/features/subscriptions/SubscriptionsPage'))
+const SelectiveSubscriptionPage = lazy(() => import('@/features/subscriptions/SelectiveSubscriptionPage'))
+const FoodBoxSubscriptionWizard = lazy(() => import('@/features/subscriptions/FoodBoxSubscriptionWizard'))
 const CharityPage       = lazy(() => import('@/features/charity/CharityPage'))
 const AdminLayout       = lazy(() => import('@/features/admin/AdminLayout'))
 const AdminDashboard    = lazy(() => import('@/features/admin/AdminDashboard'))
@@ -24,6 +26,9 @@ const AdminProducts     = lazy(() => import('@/features/admin/AdminProducts'))
 const AdminOrders       = lazy(() => import('@/features/admin/AdminOrders'))
 const AdminUsers        = lazy(() => import('@/features/admin/AdminUsers'))
 const AdminStats        = lazy(() => import('@/features/admin/AdminStats'))
+const AdminSubscriptions = lazy(() => import('@/features/admin/AdminSubscriptionsPage'))
+const AdminSelections   = lazy(() => import('@/features/admin/AdminSelectiveSubscriptionsPage'))
+const AdminCharity      = lazy(() => import('@/features/admin/AdminCharityManager'))
 const NotFound          = lazy(() => import('@/features/NotFound'))
 
 function PageLoader() {
@@ -82,7 +87,11 @@ export function AppRouter() {
           <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/loyalty" element={<ProtectedRoute><LoyaltyPage /></ProtectedRoute>} />
+          
+          {/* Routes d'abonnement */}
           <Route path="/subscriptions" element={<ProtectedRoute><SubscriptionsPage /></ProtectedRoute>} />
+          <Route path="/subscriptions/selective" element={<ProtectedRoute><SelectiveSubscriptionPage /></ProtectedRoute>} />
+          <Route path="/subscriptions/new" element={<FoodBoxSubscriptionWizard />} />
 
           <Route path="*" element={<NotFound />} />
         </Route>
@@ -93,6 +102,9 @@ export function AppRouter() {
           <Route path="orders" element={<AdminOrders />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="stats" element={<AdminStats />} />
+          <Route path="subscriptions" element={<AdminSubscriptions />} />
+          <Route path="charity" element={<AdminCharity />} />
+          <Route path="selections" element={<AdminSelections />} />
         </Route>
       </Routes>
     </Suspense>

@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ShoppingBag, Users,
   Tag, BarChart3, LogOut, ChevronRight, Bell,
-  TrendingUp, AlertTriangle,
+  TrendingUp, AlertTriangle, RefreshCw,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/stores/authStore'
@@ -12,8 +12,12 @@ const NAV_ITEMS = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/admin/orders', icon: ShoppingBag, label: 'Commandes' },
   { to: '/admin/products', icon: Package, label: 'Produits' },
+  { to: '/admin/subscriptions', icon: RefreshCw, label: 'Abonnements' },
+   { to: '/admin/selections', icon: Tag, label: 'Sélections' },
+  { to: '/admin/charity', icon: AlertTriangle, label: 'Solidarité' },
   { to: '/admin/users', icon: Users, label: 'Utilisateurs' },
   { to: '/admin/stats', icon: BarChart3, label: 'Statistiques' },
+  
 ]
 
 export default function AdminLayout() {

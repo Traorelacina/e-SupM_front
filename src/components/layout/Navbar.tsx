@@ -1,49 +1,183 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ShoppingCart, Search, User, Menu, X, ChevronDown,
-  Heart, LogOut, Settings, Package, Star,
-  Gamepad2, Gift, Sparkles, Store, Apple,
-  Salad, Cookie, Wine, Fish, Cake,
-  Crown, Baby, Sparkles as Beauty,
-  HeartPulse, Shirt, PackageOpen,
+  ShoppingCart, User, Menu, X, ChevronDown,
+  Gift, Star, Gamepad2, Package,
+  LogOut, Settings,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useCartStore } from '@/stores/cartStore'
 import { useUIStore } from '@/stores/uiStore'
-import { useSearchSuggestions } from '@/hooks/useProducts'
 import { useAuth } from '@/hooks/useAuth'
-import { formatCurrency, getInitials, LOYALTY_LEVELS } from '@/lib/utils'
+import { categoryApi } from '@/api'
+import type { Category } from '@/api'
+import { getInitials, LOYALTY_LEVELS } from '@/lib/utils'
 
-// Import du logo depuis le dossier public
 const LOGO_URL = '/logo_esup.png'
 
-// Catégories pour Nos Rayons
-const RAYONS_CATEGORIES = [
-  { href: '/rayons/produits-frais', label: 'Produits frais', icon: Apple },
-  { href: '/rayons/epicerie-salee', label: 'Épicerie salée', icon: Salad },
-  { href: '/rayons/epicerie-sucree', label: 'Épicerie sucrée', icon: Cookie },
-  { href: '/rayons/espace-soif', label: 'Espace soif', icon: Wine },
-  { href: '/rayons/boucherie-poissonnerie', label: 'Boucherie et poissonnerie', icon: Fish },
-  { href: '/rayons/pain-patisserie', label: 'Pain et pâtisserie', icon: Cake },
-  { href: '/rayons/premium', label: 'RAYON PREMIUM (Produit haut de gamme)', icon: Crown },
-  { href: '/rayons/bebe-confort', label: 'Bébé et confort', icon: Baby },
-  { href: '/rayons/hygiene-beaute', label: 'Hygiène et beauté', icon: Beauty },
-  { href: '/rayons/dietetique-sante', label: 'Diététique et santé', icon: HeartPulse },
-  { href: '/rayons/entretien-menage', label: 'Entretien et ménage', icon: Shirt },
-  { href: '/rayons/non-alimentaire', label: 'e-sup\'m non alimentaire', icon: PackageOpen },
-  { href: '/rayons/demi-gros-gros', label: '½ Gros et Gros', icon: Package },
-]
-
 const NAV_LINKS = [
-  { href: '/rayons',      label: 'Nos Rayons',             hasDropdown: true, categories: RAYONS_CATEGORIES },
-  { href: '/abonnement',  label: 'Abonnement Alimentaire', hasDropdown: true },
+  { href: '/rayons',      label: 'Nos Rayons',             hasDropdown: true, isDynamic: true },
+  { href: '/subscriptions', label: 'Abonnement Alimentaire', hasDropdown: false }, // Changé de /abonnement à /subscriptions
   { href: '/promos',      label: 'Promo / Solde',          hasDropdown: true },
   { href: '/charity',     label: 'Charity Panier',         hasDropdown: true },
   { href: '/nouveautes',  label: 'Nos Nouveautés',         hasDropdown: true },
   { href: '/conseils',    label: 'Nos Conseils',           hasDropdown: true },
 ]
+
+// Composant séparé pour les éléments du menu mobile avec sous-menu
+function MobileNavItem({ link, rayons, onClose }: { 
+  link: typeof NAV_LINKS[0], 
+  rayons: Category[], 
+  onClose: () => void 
+}) {
+  const [showSubmenu, setShowSubmenu] = useState(false)
+
+  if (link.isDynamic) {
+    return (
+      <div>
+        <button
+          onClick={() => setShowSubmenu(!showSubmenu)}
+          className="flex items-center justify-between w-full px-4 py-3 rounded-xl text-base font-bold text-green-100 hover:bg-white/10 hover:text-white transition-colors"
+        >
+          <span>{link.label}</span>
+          <ChevronDown className={`h-5 w-5 opacity-50 transition-transform duration-200 ${showSubmenu ? 'rotate-180' : ''}`} />
+        </button>
+
+        <AnimatePresence>
+          {showSubmenu && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="ml-4 space-y-1 overflow-hidden"
+            >
+              {rayons.length === 0 ? (
+                <p className="px-4 py-2 text-sm text-green-300">Chargement…</p>
+              ) : (
+                rayons.map((cat) => (
+                  <Link
+                    key={cat.id}
+                    to={`/rayons/${cat.slug}`}
+                    onClick={onClose}
+                    className="flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-green-200 hover:bg-white/10 hover:text-white transition-colors"
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: cat.color || '#86efac' }}
+                    />
+                    {cat.name}
+                  </Link>
+                ))
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    )
+  }
+
+  // Pour les liens sans dropdown (comme Abonnement Alimentaire)
+  return (
+    <Link
+      to={link.href}
+      onClick={onClose}
+      className="flex items-center justify-between px-4 py-3 rounded-xl text-base font-bold text-green-100 hover:bg-white/10 hover:text-white transition-colors"
+    >
+      <span>{link.label}</span>
+      {link.hasDropdown && <ChevronDown className="h-5 w-5 opacity-50" />}
+    </Link>
+  )
+}
+
+// Composant séparé pour les éléments du menu desktop avec dropdown
+function DesktopNavItem({ 
+  link, 
+  rayons, 
+  openDropdown, 
+  setOpenDropdown 
+}: { 
+  link: typeof NAV_LINKS[0], 
+  rayons: Category[], 
+  openDropdown: string | null, 
+  setOpenDropdown: (value: string | null) => void 
+}) {
+  const location = useLocation()
+  const isActive = location.pathname === link.href || location.pathname.startsWith(link.href + '/')
+  const isOpen = openDropdown === link.href
+
+  // Si le lien n'a pas de dropdown, on rend un simple Link
+  if (!link.hasDropdown) {
+    return (
+      <Link
+        to={link.href}
+        className={`flex items-center gap-1.5 px-3 xl:px-4 py-2 rounded-xl text-base font-bold transition-all duration-200 whitespace-nowrap ${
+          isActive
+            ? 'bg-white/20 text-white'
+            : 'text-green-100 hover:text-white hover:bg-white/10'
+        }`}
+      >
+        <span>{link.label}</span>
+      </Link>
+    )
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpenDropdown(isOpen ? null : link.href)}
+        onMouseEnter={() => link.hasDropdown && setOpenDropdown(link.href)}
+        className={`flex items-center gap-1.5 px-3 xl:px-4 py-2 rounded-xl text-base font-bold transition-all duration-200 whitespace-nowrap ${
+          isActive
+            ? 'bg-white/20 text-white'
+            : 'text-green-100 hover:text-white hover:bg-white/10'
+        }`}
+      >
+        <span>{link.label}</span>
+        {link.hasDropdown && (
+          <ChevronDown className={`h-4 w-4 opacity-60 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        )}
+      </button>
+
+      {/* Dropdown dynamique — Nos Rayons */}
+      <AnimatePresence>
+        {isOpen && link.isDynamic && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            onMouseLeave={() => setOpenDropdown(null)}
+            className="absolute left-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl overflow-hidden z-50"
+          >
+            <div className="py-2 max-h-96 overflow-y-auto">
+              {rayons.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-stone-400 text-center">Chargement…</p>
+              ) : (
+                rayons.map((cat) => (
+                  <Link
+                    key={cat.id}
+                    to={`/rayons/${cat.slug}`}
+                    onClick={() => setOpenDropdown(null)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-green-50 transition-colors group"
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: cat.color || '#16a34a' }}
+                    />
+                    <span className="text-sm font-medium text-stone-700 group-hover:text-green-700 leading-snug">
+                      {cat.name}
+                    </span>
+                  </Link>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 export function Navbar() {
   const { user, isAuthenticated } = useAuthStore()
@@ -53,34 +187,33 @@ export function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchFocused, setSearchFocused] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
 
-  const { data: suggestions } = useSearchSuggestions(searchQuery)
+  // ── Chargement dynamique des rayons ──────────────────────────────
+  const [rayons, setRayons] = useState<Category[]>([])
+
+  useEffect(() => {
+    categoryApi.list()
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data as any)?.data ?? []
+        setRayons(list.filter((c: Category) => c.is_active))
+      })
+      .catch(() => {/* silently ignore — navbar still works */})
+  }, [])
 
   useEffect(() => {
     setMobileMenuOpen(false)
     setUserMenuOpen(false)
     setOpenDropdown(null)
-    setSearchFocused(false)
-    setSearchQuery('')
     closeSearch()
   }, [location.pathname, closeSearch])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      navigate(`/catalogue?q=${encodeURIComponent(searchQuery)}`)
-      setSearchFocused(false)
-      setSearchQuery('')
-    }
-  }
-
   const levelConfig = user ? LOYALTY_LEVELS[user.loyalty_level] : null
+
+  // Fermeture du menu mobile
+  const closeMobileMenu = () => setMobileMenuOpen(false)
 
   return (
     <>
@@ -95,87 +228,31 @@ export function Navbar() {
 
       <header className="sticky top-0 z-40 bg-green-700 shadow-[0_4px_24px_rgba(0,0,0,0.18)]">
 
-        {/* ── Barre principale : Logo + Navigation + Actions ── */}
+        {/* ── Barre principale ── */}
         <div className="bg-green-700">
           <div className="container-app px-4 sm:px-6">
             <div className="flex items-center justify-between gap-2 min-h-16">
-              
+
               {/* Logo */}
               <Link to="/" className="flex items-center shrink-0">
-                <img 
-                  src={LOGO_URL}
-                  alt="e-Sup'M Logo" 
-                  className="h-10 sm:h-12 w-auto object-contain"
-                />
+                <img src={LOGO_URL} alt="e-Sup'M Logo" className="h-10 sm:h-12 w-auto object-contain" />
               </Link>
 
-              {/* Navigation Links (Desktop) */}
+              {/* Navigation Desktop */}
               <nav className="hidden lg:flex items-center gap-1 flex-1 justify-center">
-                {NAV_LINKS.map((link) => {
-                  const isActive = location.pathname.startsWith(link.href)
-                  const isOpen = openDropdown === link.href
-                  
-                  return (
-                    <div key={link.href} className="relative">
-                      <button
-                        onClick={() => setOpenDropdown(isOpen ? null : link.href)}
-                        onMouseEnter={() => link.hasDropdown && setOpenDropdown(link.href)}
-                        className={`flex items-center gap-1.5 px-3 xl:px-4 py-2 rounded-xl text-base font-bold transition-all duration-200 whitespace-nowrap ${
-                          isActive
-                            ? 'bg-white/20 text-white'
-                            : 'text-green-100 hover:text-white hover:bg-white/10'
-                        }`}
-                      >
-                        <span>{link.label}</span>
-                        {link.hasDropdown && (
-                          <ChevronDown className={`h-4 w-4 opacity-60 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-                        )}
-                      </button>
-
-                      {/* Dropdown menu pour Nos Rayons */}
-                      <AnimatePresence>
-                        {isOpen && link.categories && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.2 }}
-                            onMouseLeave={() => setOpenDropdown(null)}
-                            className="absolute left-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl overflow-hidden z-50"
-                          >
-                            <div className="py-2 max-h-96 overflow-y-auto">
-                              {link.categories.map((category) => {
-                                const Icon = category.icon
-                                return (
-                                  <Link
-                                    key={category.href}
-                                    to={category.href}
-                                    onClick={() => setOpenDropdown(null)}
-                                    className="flex items-center gap-3 px-4 py-3 hover:bg-green-50 transition-colors group"
-                                  >
-                                    <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                                      <Icon className="h-4 w-4 text-green-700" />
-                                    </div>
-                                    <span className="text-sm font-medium text-stone-700 group-hover:text-green-700">
-                                      {category.label}
-                                    </span>
-                                  </Link>
-                                )
-                              })}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  )
-                })}
+                {NAV_LINKS.map((link) => (
+                  <DesktopNavItem
+                    key={link.href}
+                    link={link}
+                    rayons={rayons}
+                    openDropdown={openDropdown}
+                    setOpenDropdown={setOpenDropdown}
+                  />
+                ))}
               </nav>
 
-              {/* Actions Droites */}
+              {/* Actions droites */}
               <div className="flex items-center gap-2 sm:gap-3">
-
-              
-                  
 
                 {/* Panier */}
                 <button
@@ -195,10 +272,9 @@ export function Navbar() {
                   )}
                 </button>
 
-                {/* Séparateur */}
                 <div className="hidden sm:block w-px h-8 bg-white/20 mx-1" />
 
-                {/* Menu Utilisateur / Boutons Auth */}
+                {/* Menu utilisateur */}
                 {isAuthenticated && user ? (
                   <div className="relative">
                     <button
@@ -246,6 +322,7 @@ export function Navbar() {
                                 <Link
                                   key={href}
                                   to={href}
+                                  onClick={() => setUserMenuOpen(false)}
                                   className="flex items-center gap-3 px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 hover:text-stone-900 transition-colors"
                                 >
                                   <Icon className="h-4 w-4 text-green-600" />
@@ -256,6 +333,7 @@ export function Navbar() {
                               {user.role === 'admin' && (
                                 <Link
                                   to="/admin"
+                                  onClick={() => setUserMenuOpen(false)}
                                   className="flex items-center gap-3 px-4 py-2.5 text-sm text-green-700 hover:bg-green-50 transition-colors font-semibold"
                                 >
                                   <Settings className="h-4 w-4" />
@@ -288,7 +366,7 @@ export function Navbar() {
                   </button>
                 )}
 
-                {/* Menu Burger Mobile */}
+                {/* Burger mobile */}
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   className="lg:hidden p-2 rounded-xl hover:bg-white/10 text-green-100 transition-all"
@@ -310,62 +388,15 @@ export function Navbar() {
               className="lg:hidden bg-green-800 border-t border-white/10 overflow-hidden"
             >
               <div className="container-app px-4 py-3 space-y-1">
-                {/* Liens de navigation mobile avec sous-menu pour Nos Rayons */}
-                {NAV_LINKS.map((link) => {
-                  const [showSubmenu, setShowSubmenu] = useState(false)
-                  
-                  return (
-                    <div key={link.href}>
-                      {link.categories ? (
-                        <>
-                          <button
-                            onClick={() => setShowSubmenu(!showSubmenu)}
-                            className="flex items-center justify-between w-full px-4 py-3 rounded-xl text-base font-bold text-green-100 hover:bg-white/10 hover:text-white transition-colors"
-                          >
-                            <span>{link.label}</span>
-                            <ChevronDown className={`h-5 w-5 opacity-50 transition-transform duration-200 ${showSubmenu ? 'rotate-180' : ''}`} />
-                          </button>
-                          <AnimatePresence>
-                            {showSubmenu && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="ml-4 space-y-1 overflow-hidden"
-                              >
-                                {link.categories.map((category) => {
-                                  const Icon = category.icon
-                                  return (
-                                    <Link
-                                      key={category.href}
-                                      to={category.href}
-                                      onClick={() => setMobileMenuOpen(false)}
-                                      className="flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-green-200 hover:bg-white/10 hover:text-white transition-colors"
-                                    >
-                                      <Icon className="h-4 w-4" />
-                                      {category.label}
-                                    </Link>
-                                  )
-                                })}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </>
-                      ) : (
-                        <Link
-                          to={link.href}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="flex items-center justify-between px-4 py-3 rounded-xl text-base font-bold text-green-100 hover:bg-white/10 hover:text-white transition-colors"
-                        >
-                          <span>{link.label}</span>
-                          {link.hasDropdown && <ChevronDown className="h-5 w-5 opacity-50" />}
-                        </Link>
-                      )}
-                    </div>
-                  )
-                })}
+                {NAV_LINKS.map((link) => (
+                  <MobileNavItem
+                    key={link.href}
+                    link={link}
+                    rayons={rayons}
+                    onClose={closeMobileMenu}
+                  />
+                ))}
 
-                {/* Boutons auth mobile */}
                 {!isAuthenticated && (
                   <div className="pt-3 mt-2 border-t border-white/10 flex flex-col gap-2">
                     <button

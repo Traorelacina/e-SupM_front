@@ -12,9 +12,9 @@ export function useCart() {
   const { data, isLoading } = useQuery({
     queryKey: CART_KEY,
     queryFn: async () => {
-      const { data } = await cartApi.get()
-      setCart(data.cart, data.summary)
-      return data
+      const cartData = await cartApi.get()
+      setCart(cartData.cart, cartData.summary)
+      return cartData
     },
     staleTime: 1000 * 30,
   })
