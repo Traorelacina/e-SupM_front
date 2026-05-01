@@ -7,6 +7,8 @@ import { useAuthStore } from '@/stores/authStore'
 const HomePage          = lazy(() => import('@/features/home/HomePage'))
 const CataloguePage     = lazy(() => import('@/features/catalogue/CataloguePage'))
 const ProductDetail     = lazy(() => import('@/features/catalogue/ProductDetail'))
+const PromosPage        = lazy(() => import('@/features/catalogue/PromosPage'))
+const NouveautesPage    = lazy(() => import('@/features/catalogue/NouveautesPage'))
 const LoginPage         = lazy(() => import('@/features/auth/LoginPage'))
 const RegisterPage      = lazy(() => import('@/features/auth/RegisterPage'))
 const CartPage          = lazy(() => import('@/features/cart/CartPage'))
@@ -20,6 +22,12 @@ const SubscriptionsPage = lazy(() => import('@/features/subscriptions/Subscripti
 const SelectiveSubscriptionPage = lazy(() => import('@/features/subscriptions/SelectiveSubscriptionPage'))
 const FoodBoxSubscriptionWizard = lazy(() => import('@/features/subscriptions/FoodBoxSubscriptionWizard'))
 const CharityPage       = lazy(() => import('@/features/charity/CharityPage'))
+
+// ── Nos Conseils (public) ──────────────────────────────────────────
+const ConseilsPage      = lazy(() => import('@/features/conseils/ConseilsPage'))
+const ConseilDetailPage = lazy(() => import('@/features/conseils/ConseilDetailPage'))
+
+// Admin
 const AdminLayout       = lazy(() => import('@/features/admin/AdminLayout'))
 const AdminDashboard    = lazy(() => import('@/features/admin/AdminDashboard'))
 const AdminProducts     = lazy(() => import('@/features/admin/AdminProducts'))
@@ -29,6 +37,10 @@ const AdminStats        = lazy(() => import('@/features/admin/AdminStats'))
 const AdminSubscriptions = lazy(() => import('@/features/admin/AdminSubscriptionsPage'))
 const AdminSelections   = lazy(() => import('@/features/admin/AdminSelectiveSubscriptionsPage'))
 const AdminCharity      = lazy(() => import('@/features/admin/AdminCharityManager'))
+
+// ── Admin Nos Conseils ─────────────────────────────────────────────
+const AdminConseils     = lazy(() => import('@/features/admin/AdminConseils'))
+
 const NotFound          = lazy(() => import('@/features/NotFound'))
 
 function PageLoader() {
@@ -72,23 +84,32 @@ export function AppRouter() {
           <Route path="/rayons" element={<CataloguePage />} />
           <Route path="/rayons/:slug" element={<CataloguePage />} />
           <Route path="/produit/:slug" element={<ProductDetail />} />
-          <Route path="/promos" element={<CataloguePage />} />
+
+          {/* Promotions & Nouveautés */}
+          <Route path="/promos" element={<PromosPage />} />
+          <Route path="/nouveautes" element={<NouveautesPage />} />
+
           <Route path="/good-box" element={<CataloguePage />} />
-          <Route path="/nouveautes" element={<CataloguePage />} />
           <Route path="/games" element={<GamesPage />} />
           <Route path="/charity" element={<CharityPage />} />
 
+          {/* ── Nos Conseils ── */}
+          <Route path="/conseils" element={<ConseilsPage />} />
+          <Route path="/conseils/:slug" element={<ConseilDetailPage />} />
+
+          {/* Auth */}
           <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
           <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
 
+          {/* Espace client (auth requis) */}
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
           <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/loyalty" element={<ProtectedRoute><LoyaltyPage /></ProtectedRoute>} />
-          
-          {/* Routes d'abonnement */}
+
+          {/* Abonnements */}
           <Route path="/subscriptions" element={<ProtectedRoute><SubscriptionsPage /></ProtectedRoute>} />
           <Route path="/subscriptions/selective" element={<ProtectedRoute><SelectiveSubscriptionPage /></ProtectedRoute>} />
           <Route path="/subscriptions/new" element={<FoodBoxSubscriptionWizard />} />
@@ -96,7 +117,17 @@ export function AppRouter() {
           <Route path="*" element={<NotFound />} />
         </Route>
 
-        <Route path="/admin" element={<ProtectedRoute adminOnly><Suspense fallback={<PageLoader />}><AdminLayout /></Suspense></ProtectedRoute>}>
+        {/* ── Admin ── */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute adminOnly>
+              <Suspense fallback={<PageLoader />}>
+                <AdminLayout />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<AdminDashboard />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="orders" element={<AdminOrders />} />
@@ -105,6 +136,9 @@ export function AppRouter() {
           <Route path="subscriptions" element={<AdminSubscriptions />} />
           <Route path="charity" element={<AdminCharity />} />
           <Route path="selections" element={<AdminSelections />} />
+
+          {/* ── Nos Conseils admin ── */}
+          <Route path="conseils" element={<AdminConseils />} />
         </Route>
       </Routes>
     </Suspense>

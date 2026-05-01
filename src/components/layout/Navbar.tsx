@@ -3,8 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ShoppingCart, User, Menu, X, ChevronDown,
-  Gift, Star, Gamepad2, Package,
-  LogOut, Settings,
+  Gift, Star, Gamepad2, Package, LogOut, Settings,
+  Leaf, Lightbulb, ChefHat, BookOpen,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useCartStore } from '@/stores/cartStore'
@@ -16,23 +16,69 @@ import { getInitials, LOYALTY_LEVELS } from '@/lib/utils'
 
 const LOGO_URL = '/logo_esup.png'
 
-const NAV_LINKS = [
-  { href: '/rayons',      label: 'Nos Rayons',             hasDropdown: true, isDynamic: true },
-  { href: '/subscriptions', label: 'Abonnement Alimentaire', hasDropdown: false }, // Changé de /abonnement à /subscriptions
-  { href: '/promos',      label: 'Promo / Solde',          hasDropdown: true },
-  { href: '/charity',     label: 'Charity Panier',         hasDropdown: true },
-  { href: '/nouveautes',  label: 'Nos Nouveautés',         hasDropdown: true },
-  { href: '/conseils',    label: 'Nos Conseils',           hasDropdown: true },
+// ── Types ─────────────────────────────────────────────────────────────
+
+interface NavLink {
+  href: string
+  label: string
+  hasDropdown?: boolean
+  isDynamic?: boolean   // rayons (chargés depuis l'API)
+  isConseils?: boolean  // dropdown statique Nos Conseils
+}
+
+// ── Config navigation ─────────────────────────────────────────────────
+
+const NAV_LINKS: NavLink[] = [
+  { href: '/rayons',        label: 'Nos Rayons',             hasDropdown: true,  isDynamic: true  },
+  { href: '/subscriptions', label: 'Abonnement Alimentaire', hasDropdown: false },
+  { href: '/promos',        label: 'Promo / Solde' },
+  { href: '/charity',       label: 'Charity Panier' },
+  { href: '/nouveautes',    label: 'Nos Nouveautés' },
+  { href: '/conseils',      label: 'Nos Conseils',           hasDropdown: true,  isConseils: true },
 ]
 
-// Composant séparé pour les éléments du menu mobile avec sous-menu
-function MobileNavItem({ link, rayons, onClose }: { 
-  link: typeof NAV_LINKS[0], 
-  rayons: Category[], 
-  onClose: () => void 
+// Sous-catégories statiques du dropdown Conseils
+const CONSEILS_ITEMS = [
+  {
+    href: '/conseils?category=nutrition',
+    label: 'Nutrition',
+    desc: 'Alimentation équilibrée & santé',
+    icon: Leaf,
+    color: '#16a34a',
+    iconBg: 'bg-emerald-50 text-emerald-600',
+  },
+  {
+    href: '/conseils?category=astuce',
+    label: 'Astuce',
+    desc: 'Trucs pratiques du quotidien',
+    icon: Lightbulb,
+    color: '#d97706',
+    iconBg: 'bg-amber-50 text-amber-600',
+  },
+  {
+    href: '/conseils?category=recette',
+    label: 'Recette',
+    desc: 'Recettes faciles & savoureuses',
+    icon: ChefHat,
+    color: '#ea580c',
+    iconBg: 'bg-orange-50 text-orange-600',
+  },
+]
+
+// ── MobileNavItem ─────────────────────────────────────────────────────
+
+function MobileNavItem({
+  link,
+  rayons,
+  onClose,
+}: {
+  link: NavLink
+  rayons: Category[]
+  onClose: () => void
 }) {
   const [showSubmenu, setShowSubmenu] = useState(false)
 
+  // Dropdown dynamique rayons
   if (link.isDynamic) {
     return (
       <div>
@@ -77,7 +123,61 @@ function MobileNavItem({ link, rayons, onClose }: {
     )
   }
 
-  // Pour les liens sans dropdown (comme Abonnement Alimentaire)
+  // Dropdown statique Nos Conseils
+  if (link.isConseils) {
+    return (
+      <div>
+        <button
+          onClick={() => setShowSubmenu(!showSubmenu)}
+          className="flex items-center justify-between w-full px-4 py-3 rounded-xl text-base font-bold text-green-100 hover:bg-white/10 hover:text-white transition-colors"
+        >
+          <span>{link.label}</span>
+          <ChevronDown className={`h-5 w-5 opacity-50 transition-transform duration-200 ${showSubmenu ? 'rotate-180' : ''}`} />
+        </button>
+
+        <AnimatePresence>
+          {showSubmenu && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="ml-4 space-y-1 overflow-hidden"
+            >
+              {/* Lien "Tous les conseils" */}
+              <Link
+                to="/conseils"
+                onClick={onClose}
+                className="flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold text-green-200 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                <BookOpen className="w-4 h-4 opacity-70" />
+                Tous les conseils
+              </Link>
+
+              {CONSEILS_ITEMS.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    onClick={onClose}
+                    className="flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-green-200 hover:bg-white/10 hover:text-white transition-colors"
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    )
+  }
+
+  // Lien simple
   return (
     <Link
       to={link.href}
@@ -90,34 +190,33 @@ function MobileNavItem({ link, rayons, onClose }: {
   )
 }
 
-// Composant séparé pour les éléments du menu desktop avec dropdown
-function DesktopNavItem({ 
-  link, 
-  rayons, 
-  openDropdown, 
-  setOpenDropdown 
-}: { 
-  link: typeof NAV_LINKS[0], 
-  rayons: Category[], 
-  openDropdown: string | null, 
-  setOpenDropdown: (value: string | null) => void 
+// ── DesktopNavItem ────────────────────────────────────────────────────
+
+function DesktopNavItem({
+  link,
+  rayons,
+  openDropdown,
+  setOpenDropdown,
+}: {
+  link: NavLink
+  rayons: Category[]
+  openDropdown: string | null
+  setOpenDropdown: (v: string | null) => void
 }) {
   const location = useLocation()
   const isActive = location.pathname === link.href || location.pathname.startsWith(link.href + '/')
-  const isOpen = openDropdown === link.href
+  const isOpen   = openDropdown === link.href
 
-  // Si le lien n'a pas de dropdown, on rend un simple Link
+  // Lien simple (sans dropdown)
   if (!link.hasDropdown) {
     return (
       <Link
         to={link.href}
         className={`flex items-center gap-1.5 px-3 xl:px-4 py-2 rounded-xl text-base font-bold transition-all duration-200 whitespace-nowrap ${
-          isActive
-            ? 'bg-white/20 text-white'
-            : 'text-green-100 hover:text-white hover:bg-white/10'
+          isActive ? 'bg-white/20 text-white' : 'text-green-100 hover:text-white hover:bg-white/10'
         }`}
       >
-        <span>{link.label}</span>
+        {link.label}
       </Link>
     )
   }
@@ -126,52 +225,100 @@ function DesktopNavItem({
     <div className="relative">
       <button
         onClick={() => setOpenDropdown(isOpen ? null : link.href)}
-        onMouseEnter={() => link.hasDropdown && setOpenDropdown(link.href)}
+        onMouseEnter={() => setOpenDropdown(link.href)}
         className={`flex items-center gap-1.5 px-3 xl:px-4 py-2 rounded-xl text-base font-bold transition-all duration-200 whitespace-nowrap ${
-          isActive
-            ? 'bg-white/20 text-white'
-            : 'text-green-100 hover:text-white hover:bg-white/10'
+          isActive ? 'bg-white/20 text-white' : 'text-green-100 hover:text-white hover:bg-white/10'
         }`}
       >
         <span>{link.label}</span>
-        {link.hasDropdown && (
-          <ChevronDown className={`h-4 w-4 opacity-60 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-        )}
+        <ChevronDown className={`h-4 w-4 opacity-60 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Dropdown dynamique — Nos Rayons */}
       <AnimatePresence>
-        {isOpen && link.isDynamic && (
+        {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.18 }}
             onMouseLeave={() => setOpenDropdown(null)}
-            className="absolute left-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl overflow-hidden z-50"
+            className="absolute left-0 top-full mt-2 bg-white rounded-2xl shadow-2xl overflow-hidden z-50"
+            style={{ minWidth: link.isConseils ? '280px' : '288px' }}
           >
-            <div className="py-2 max-h-96 overflow-y-auto">
-              {rayons.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-stone-400 text-center">Chargement…</p>
-              ) : (
-                rayons.map((cat) => (
+
+            {/* ── Dropdown Rayons (dynamique) ── */}
+            {link.isDynamic && (
+              <div className="py-2 max-h-96 overflow-y-auto w-72">
+                {rayons.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-stone-400 text-center">Chargement…</p>
+                ) : (
+                  rayons.map((cat) => (
+                    <Link
+                      key={cat.id}
+                      to={`/rayons/${cat.slug}`}
+                      onClick={() => setOpenDropdown(null)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-green-50 transition-colors group"
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: cat.color || '#16a34a' }}
+                      />
+                      <span className="text-sm font-medium text-stone-700 group-hover:text-green-700 leading-snug">
+                        {cat.name}
+                      </span>
+                    </Link>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ── Dropdown Nos Conseils (statique) ── */}
+            {link.isConseils && (
+              <div className="w-72">
+                {/* Header */}
+                <div className="px-4 py-3 border-b border-stone-100 bg-gradient-to-r from-green-50 to-emerald-50">
+                  <p className="text-xs font-bold text-green-700 uppercase tracking-wide">Nos Conseils</p>
+                  <p className="text-xs text-stone-400 mt-0.5">Nutrition, astuces & recettes</p>
+                </div>
+
+                {/* Sous-catégories */}
+                <div className="py-2">
+                  {CONSEILS_ITEMS.map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <Link
+                        key={item.href}
+                        to={item.href}
+                        onClick={() => setOpenDropdown(null)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition-colors group"
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${item.iconBg}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-stone-800 group-hover:text-green-700 transition-colors">
+                            {item.label}
+                          </div>
+                          <div className="text-xs text-stone-400">{item.desc}</div>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+
+                {/* Lien "Voir tout" */}
+                <div className="border-t border-stone-100 px-4 py-2.5">
                   <Link
-                    key={cat.id}
-                    to={`/rayons/${cat.slug}`}
+                    to="/conseils"
                     onClick={() => setOpenDropdown(null)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-green-50 transition-colors group"
+                    className="flex items-center gap-2 text-sm font-semibold text-green-700 hover:text-green-800 transition-colors"
                   >
-                    <span
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: cat.color || '#16a34a' }}
-                    />
-                    <span className="text-sm font-medium text-stone-700 group-hover:text-green-700 leading-snug">
-                      {cat.name}
-                    </span>
+                    <BookOpen className="w-4 h-4" />
+                    Voir tous les conseils →
                   </Link>
-                ))
-              )}
-            </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -179,30 +326,32 @@ function DesktopNavItem({
   )
 }
 
+// ── Navbar ────────────────────────────────────────────────────────────
+
 export function Navbar() {
   const { user, isAuthenticated } = useAuthStore()
-  const { summary, toggleCart } = useCartStore()
-  const { closeSearch } = useUIStore()
-  const { logout } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
+  const { summary, toggleCart }   = useCartStore()
+  const { closeSearch }           = useUIStore()
+  const { logout }                = useAuth()
+  const navigate   = useNavigate()
+  const location   = useLocation()
 
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [userMenuOpen,   setUserMenuOpen]   = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [openDropdown,   setOpenDropdown]   = useState<string | null>(null)
+  const [rayons,         setRayons]         = useState<Category[]>([])
 
-  // ── Chargement dynamique des rayons ──────────────────────────────
-  const [rayons, setRayons] = useState<Category[]>([])
-
+  // Chargement des rayons
   useEffect(() => {
     categoryApi.list()
       .then((data) => {
         const list = Array.isArray(data) ? data : (data as any)?.data ?? []
         setRayons(list.filter((c: Category) => c.is_active))
       })
-      .catch(() => {/* silently ignore — navbar still works */})
+      .catch(() => {})
   }, [])
 
+  // Fermeture au changement de route
   useEffect(() => {
     setMobileMenuOpen(false)
     setUserMenuOpen(false)
@@ -210,14 +359,12 @@ export function Navbar() {
     closeSearch()
   }, [location.pathname, closeSearch])
 
-  const levelConfig = user ? LOYALTY_LEVELS[user.loyalty_level] : null
-
-  // Fermeture du menu mobile
+  const levelConfig     = user ? LOYALTY_LEVELS[user.loyalty_level] : null
   const closeMobileMenu = () => setMobileMenuOpen(false)
 
   return (
     <>
-      {/* ── Announcement bar ── */}
+      {/* ── Bande d'annonce ── */}
       <div className="bg-red-600 text-white text-center py-2 px-4 text-sm font-semibold tracking-wide overflow-x-auto whitespace-nowrap">
         <span>Livraison gratuite dès 50 000 FCFA</span>
         <span className="mx-2">|</span>
@@ -227,8 +374,6 @@ export function Navbar() {
       </div>
 
       <header className="sticky top-0 z-40 bg-green-700 shadow-[0_4px_24px_rgba(0,0,0,0.18)]">
-
-        {/* ── Barre principale ── */}
         <div className="bg-green-700">
           <div className="container-app px-4 sm:px-6">
             <div className="flex items-center justify-between gap-2 min-h-16">
@@ -238,7 +383,7 @@ export function Navbar() {
                 <img src={LOGO_URL} alt="e-Sup'M Logo" className="h-10 sm:h-12 w-auto object-contain" />
               </Link>
 
-              {/* Navigation Desktop */}
+              {/* Navigation desktop */}
               <nav className="hidden lg:flex items-center gap-1 flex-1 justify-center">
                 {NAV_LINKS.map((link) => (
                   <DesktopNavItem
@@ -301,6 +446,7 @@ export function Navbar() {
                             transition={{ duration: 0.13 }}
                             className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.15)] border border-stone-100 overflow-hidden z-20"
                           >
+                            {/* Entête utilisateur */}
                             <div className="px-4 py-4 bg-gradient-to-br from-green-50 to-emerald-50 border-b border-stone-100">
                               <div className="font-bold text-stone-900 text-sm">{user.name}</div>
                               <div className="text-xs text-stone-500 mt-0.5">{user.email}</div>
@@ -417,7 +563,6 @@ export function Navbar() {
             </motion.div>
           )}
         </AnimatePresence>
-
       </header>
     </>
   )

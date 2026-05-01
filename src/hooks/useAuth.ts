@@ -12,12 +12,20 @@ export function useAuth() {
 
   const loginMutation = useMutation({
     mutationFn: (data: LoginCredentials) => authApi.login(data),
-    onSuccess: (response) => {
+    onSuccess: async (response) => {
       // ✅ Correction: response contient directement { user, token }
       console.log('Login response:', response)
       
       if (response?.user && response?.token) {
         setAuth(response.user, response.token)
+        
+        // ✅ Important: Invalider le cache du panier pour forcer un rechargement
+        // Cela va automatiquement recharger le panier avec les données de l'utilisateur connecté
+        await queryClient.invalidateQueries({ queryKey: ['cart'] })
+        
+        // Also invalidate user data
+        await queryClient.invalidateQueries({ queryKey: ['me'] })
+        
         queryClient.clear()
         toast.success(`Bienvenue, ${response.user.name} ! 🎉`)
         navigate(response.user.role === 'admin' ? '/admin' : '/')
@@ -34,11 +42,16 @@ export function useAuth() {
 
   const registerMutation = useMutation({
     mutationFn: (data: RegisterData) => authApi.register(data),
-    onSuccess: (response) => {
+    onSuccess: async (response) => {
       console.log('Register response:', response)
       
       if (response?.user && response?.token) {
         setAuth(response.user, response.token)
+        
+        // ✅ Important: Invalider le cache du panier après inscription
+        await queryClient.invalidateQueries({ queryKey: ['cart'] })
+        await queryClient.invalidateQueries({ queryKey: ['me'] })
+        
         toast.success('Compte créé avec succès ! 100 points offerts 🎁')
         navigate('/')
       } else {
@@ -54,8 +67,13 @@ export function useAuth() {
 
   const logoutMutation = useMutation({
     mutationFn: () => authApi.logout(),
-    onSettled: () => {
+    onSettled: async () => {
       storeLogout()
+      
+      // ✅ Important: Invalider le cache du panier pour éviter d'afficher l'ancien panier
+      await queryClient.invalidateQueries({ queryKey: ['cart'] })
+      await queryClient.invalidateQueries({ queryKey: ['me'] })
+      
       queryClient.clear()
       navigate('/login')
       toast.success('À bientôt !')

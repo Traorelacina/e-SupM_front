@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -6,59 +6,42 @@ import { z } from 'zod'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MapPin, CreditCard, Package, CheckCircle, ArrowRight, ArrowLeft,
-  Home, Store, Truck, Shield, Tag, Star, ChevronRight, Plus,
+  Home, Store, Shield, Tag, Star, ChevronRight, Plus,
+  Truck,
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { addressApi, orderApi } from '@/api'
-import { useCart } from '@/hooks/useCart'
+import { useCart, getCartItemImageUrl } from '@/hooks/useCart'
 import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Badge } from '@/components/ui/Badge'
 import toast from 'react-hot-toast'
 
-// ============================================================
-// STYLES
-// ============================================================
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const PAGE_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600;700&display=swap');
-
   .ck-font-display { font-family: 'Playfair Display', Georgia, serif; }
   .ck-font-body    { font-family: 'DM Sans', system-ui, sans-serif; }
 
-  .ck-card {
-    background: white;
-    border: 1px solid rgba(139,94,60,0.12);
-    border-radius: 20px;
-    padding: 24px;
-  }
+  .ck-card { background: white; border: 1px solid rgba(139,94,60,0.12); border-radius: 20px; padding: 24px; }
 
   .ck-option {
     display: flex; align-items: flex-start; gap: 12px;
-    padding: 14px 16px;
-    border-radius: 14px;
-    border: 2px solid rgba(139,94,60,0.15);
-    cursor: pointer;
-    transition: all 0.18s;
+    padding: 14px 16px; border-radius: 14px;
+    border: 2px solid rgba(139,94,60,0.15); cursor: pointer; transition: all 0.18s;
   }
   .ck-option:hover { border-color: rgba(232,130,12,0.4); background: #fffbf5; }
   .ck-option.selected { border-color: #e8820c; background: #fffbf5; }
 
-  .ck-radio {
-    width: 18px; height: 18px;
-    accent-color: #e8820c;
-    margin-top: 1px; cursor: pointer; shrink-0: 0;
-  }
+  .ck-radio { width: 18px; height: 18px; accent-color: #e8820c; margin-top: 1px; cursor: pointer; }
 
   .ck-textarea {
     font-family: 'DM Sans', system-ui, sans-serif;
-    font-size: 13px; color: #1a1209;
-    background: #faf7f2;
-    border: 1.5px solid rgba(139,94,60,0.18);
-    border-radius: 12px;
-    padding: 12px 14px;
-    width: 100%; outline: none; resize: none;
+    font-size: 13px; color: #1a1209; background: #faf7f2;
+    border: 1.5px solid rgba(139,94,60,0.18); border-radius: 12px;
+    padding: 12px 14px; width: 100%; outline: none; resize: none;
     transition: border-color 0.15s, background 0.15s;
   }
   .ck-textarea:focus { border-color: #e8820c; background: white; }
@@ -70,28 +53,20 @@ const PAGE_STYLES = `
     width:30%; height:2.5px; background:#e8820c; border-radius:2px;
   }
 
-  .ck-summary-row {
-    display: flex; justify-content: space-between; align-items: center;
-  }
+  .ck-summary-row { display: flex; justify-content: space-between; align-items: center; }
 
-  .ck-step-connector {
-    height: 2px; flex: 1;
-    margin: 0 8px;
-    border-radius: 2px;
-    transition: background 0.3s;
-  }
+  .ck-step-connector { height: 2px; flex: 1; margin: 0 8px; border-radius: 2px; transition: background 0.3s; }
 
   .ck-scrollbar::-webkit-scrollbar { width: 3px; }
   .ck-scrollbar::-webkit-scrollbar-thumb { background: rgba(139,94,60,0.2); border-radius: 2px; }
 `
 
-// ============================================================
-// STEP INDICATOR
-// ============================================================
+// ─── Steps ────────────────────────────────────────────────────────────────────
+
 const STEPS = [
-  { id: 'delivery', label: 'Livraison',     Icon: Truck },
-  { id: 'payment',  label: 'Paiement',      Icon: CreditCard },
-  { id: 'confirm',  label: 'Confirmation',  Icon: CheckCircle },
+  { id: 'delivery', label: 'Livraison',    Icon: Truck },
+  { id: 'payment',  label: 'Paiement',     Icon: CreditCard },
+  { id: 'confirm',  label: 'Confirmation', Icon: CheckCircle },
 ]
 type Step = 'delivery' | 'payment' | 'confirm'
 
@@ -100,9 +75,7 @@ function StepIndicator({ current }: { current: Step }) {
   return (
     <div className="flex items-center justify-center mb-10">
       {STEPS.map((s, i) => {
-        const done   = i < idx
-        const active = i === idx
-        const Icon   = s.Icon
+        const done = i < idx; const active = i === idx; const Icon = s.Icon
         return (
           <div key={s.id} className="flex items-center">
             <div className="flex flex-col items-center gap-1.5">
@@ -115,8 +88,7 @@ function StepIndicator({ current }: { current: Step }) {
                   : active
                   ? { background: '#e8820c', color: 'white', boxShadow: '0 0 0 4px rgba(232,130,12,0.18)' }
                   : { background: '#f5efe6', color: '#8b5e3c' }
-                }
-              >
+                }>
                 {done ? <CheckCircle className="h-5 w-5" /> : <Icon className="h-4 w-4" />}
               </motion.div>
               <span className="ck-font-body text-[10px] font-bold hidden sm:block"
@@ -135,12 +107,32 @@ function StepIndicator({ current }: { current: Step }) {
   )
 }
 
-// ============================================================
-// CART SIDEBAR
-// ============================================================
+// ─── Cart sidebar ─────────────────────────────────────────────────────────────
+
 function CartSidebar({ cart, summary, loyaltyDiscount, finalTotal }: {
-  cart: any; summary: any; loyaltyDiscount: number; finalTotal: number
+  cart: ReturnType<typeof useCart>['cart']
+  summary: ReturnType<typeof useCart>['summary']
+  loyaltyDiscount: number
+  finalTotal: number
 }) {
+  const deliveryFee    = summary?.delivery_fee    ?? 0
+  const subtotal       = summary?.subtotal        ?? 0
+
+  // Attendre que le panier soit chargé
+  if (!cart || !summary) {
+    return (
+      <div className="ck-card">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 bg-gray-200 rounded w-3/4"></div>
+          <div className="space-y-2">
+            <div className="h-16 bg-gray-200 rounded"></div>
+            <div className="h-16 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="ck-card">
       <h3 className="ck-font-display font-black text-base mb-4" style={{ color: '#1a1209' }}>
@@ -149,31 +141,37 @@ function CartSidebar({ cart, summary, loyaltyDiscount, finalTotal }: {
 
       {/* Items */}
       <div className="space-y-2 max-h-52 overflow-y-auto ck-scrollbar mb-4">
-        {cart?.items?.map((item: any) => (
-          <div key={item.id} className="flex items-center gap-3 py-2"
-            style={{ borderBottom: '1px solid rgba(139,94,60,0.07)' }}>
-            <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0"
-              style={{ background: '#f5efe6', border: '1px solid rgba(139,94,60,0.1)' }}>
-              {item.product?.primary_image_url
-                ? <img src={item.product.primary_image_url} alt="" className="w-full h-full object-cover" />
-                : <div className="h-full flex items-center justify-center">
-                    <Package className="h-4 w-4" style={{ color: '#8b5e3c', opacity: 0.3 }} />
-                  </div>
-              }
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="ck-font-body text-xs font-semibold truncate" style={{ color: '#1a1209' }}>
-                {item.product?.name}
+        {cart.items?.map(item => {
+          const imgUrl    = getCartItemImageUrl(item)
+          const unitPrice = item.price ?? item.product?.price ?? 0
+          const lineTotal = item.line_total ?? unitPrice * item.quantity
+
+          return (
+            <div key={item.id} className="flex items-center gap-3 py-2"
+              style={{ borderBottom: '1px solid rgba(139,94,60,0.07)' }}>
+              <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0"
+                style={{ background: '#f5efe6', border: '1px solid rgba(139,94,60,0.1)' }}>
+                {imgUrl
+                  ? <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                  : <div className="h-full flex items-center justify-center">
+                      <Package className="h-4 w-4" style={{ color: '#8b5e3c', opacity: 0.3 }} />
+                    </div>
+                }
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="ck-font-body text-xs font-semibold truncate" style={{ color: '#1a1209' }}>
+                  {item.product?.name ?? `Produit #${item.product_id}`}
+                </p>
+                <p className="ck-font-body text-[10px]" style={{ color: '#8b5e3c', opacity: 0.6 }}>
+                  ×{item.quantity} · {formatCurrency(unitPrice)}/u
+                </p>
+              </div>
+              <p className="ck-font-body text-xs font-bold shrink-0" style={{ color: '#1a1209' }}>
+                {formatCurrency(lineTotal)}
               </p>
-              <p className="ck-font-body text-[10px]" style={{ color: '#8b5e3c', opacity: 0.6 }}>
-                ×{item.quantity} · {formatCurrency(item.price)}/u
-              </p>
             </div>
-            <p className="ck-font-body text-xs font-bold shrink-0" style={{ color: '#1a1209' }}>
-              {formatCurrency(item.line_total)}
-            </p>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Totals */}
@@ -181,14 +179,14 @@ function CartSidebar({ cart, summary, loyaltyDiscount, finalTotal }: {
         <div className="ck-summary-row">
           <span className="ck-font-body text-sm" style={{ color: '#8b5e3c' }}>Sous-total</span>
           <span className="ck-font-body text-sm font-semibold" style={{ color: '#1a1209' }}>
-            {formatCurrency(summary?.subtotal ?? 0)}
+            {formatCurrency(subtotal)}
           </span>
         </div>
         <div className="ck-summary-row">
           <span className="ck-font-body text-sm" style={{ color: '#8b5e3c' }}>Livraison</span>
           <span className="ck-font-body text-sm font-semibold"
-            style={{ color: (summary?.delivery_fee ?? 0) === 0 ? '#16a34a' : '#1a1209' }}>
-            {(summary?.delivery_fee ?? 0) === 0 ? 'Gratuite' : formatCurrency(summary!.delivery_fee)}
+            style={{ color: deliveryFee === 0 ? '#16a34a' : '#1a1209' }}>
+            {deliveryFee === 0 ? 'Gratuite' : formatCurrency(deliveryFee)}
           </span>
         </div>
         {loyaltyDiscount > 0 && (
@@ -217,40 +215,56 @@ function CartSidebar({ cart, summary, loyaltyDiscount, finalTotal }: {
   )
 }
 
-// ============================================================
-// FORM SCHEMAS
-// ============================================================
+// ─── Schemas ──────────────────────────────────────────────────────────────────
+
 const newAddressSchema = z.object({
   recipient_name: z.string().min(2, 'Minimum 2 caractères'),
-  phone: z.string().min(8, 'Numéro invalide'),
-  address_line1: z.string().min(5, 'Adresse trop courte'),
-  city: z.string().min(2, 'Ville requise'),
-  district: z.string().optional(),
+  phone:          z.string().min(8, 'Numéro invalide'),
+  address_line1:  z.string().min(5, 'Adresse trop courte'),
+  city:           z.string().min(2, 'Ville requise'),
+  district:       z.string().optional(),
 })
 type NewAddressForm = z.infer<typeof newAddressSchema>
 
-// ============================================================
-// MAIN PAGE
-// ============================================================
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function CheckoutPage() {
-  const { cart, summary } = useCart()
-  const { user }          = useAuthStore()
+  const { cart, summary, isLoading: cartLoading, error: cartError, refetch: refetchCart } = useCart()
+  const { user, isAuthenticated } = useAuthStore()
   const navigate          = useNavigate()
   const queryClient       = useQueryClient()
 
-  const [step, setStep]                       = useState<Step>('delivery')
-  const [deliveryType, setDeliveryType]       = useState('home')
+  const [step, setStep]                           = useState<Step>('delivery')
+  const [deliveryType, setDeliveryType]           = useState('home')
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
-  const [showNewAddress, setShowNewAddress]   = useState(false)
-  const [paymentMethod, setPaymentMethod]     = useState('cinetpay')
-  const [useLoyalty, setUseLoyalty]           = useState(false)
-  const [loyaltyPoints, setLoyaltyPoints]     = useState(0)
-  const [notes, setNotes]                     = useState('')
-  const [createdOrderId, setCreatedOrderId]   = useState<number | null>(null)
+  const [showNewAddress, setShowNewAddress]       = useState(false)
+  const [paymentMethod, setPaymentMethod]         = useState('cinetpay')
+  const [useLoyalty, setUseLoyalty]               = useState(false)
+  const [loyaltyPoints, setLoyaltyPoints]         = useState(0)
+  const [notes, setNotes]                         = useState('')
+  const [createdOrder, setCreatedOrder]           = useState<{ id: number; reference: string; total: number } | null>(null)
 
-  const { data: addresses } = useQuery({
+  // Rediriger si panier vide
+  useEffect(() => {
+    if (!cartLoading && (!cart || cart.items?.length === 0) && step !== 'confirm') {
+      toast.error('Votre panier est vide')
+      navigate('/cart')
+    }
+  }, [cart, cartLoading, navigate, step])
+
+  // Recharger le panier si erreur d'authentification
+  useEffect(() => {
+    if (cartError && isAuthenticated) {
+      console.log('Erreur de chargement du panier, tentative de rechargement...')
+      const timer = setTimeout(() => refetchCart(), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [cartError, isAuthenticated, refetchCart])
+
+  const { data: addresses, isLoading: addressesLoading } = useQuery({
     queryKey: ['addresses'],
-    queryFn: () => addressApi.list().then(r => r.data),
+    queryFn:  () => addressApi.list().then((r: any) => (Array.isArray(r) ? r : r.data ?? [])),
+    enabled: isAuthenticated,
   })
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<NewAddressForm>({
@@ -258,46 +272,58 @@ export default function CheckoutPage() {
   })
 
   const createAddressMutation = useMutation({
-    mutationFn: (data: NewAddressForm) => addressApi.create(data),
-    onSuccess: ({ data: newAddr }: any) => {
+    mutationFn: (data: NewAddressForm) => addressApi.create(data as any),
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['addresses'] })
+      const newAddr = res.data ?? res
       setSelectedAddressId(newAddr.id)
       setShowNewAddress(false)
       reset()
       toast.success('Adresse enregistrée')
     },
+    onError: (e: any) => toast.error(e?.message ?? 'Erreur'),
   })
 
   const createOrderMutation = useMutation({
     mutationFn: () => orderApi.create({
-      address_id: selectedAddressId ?? undefined,
-      delivery_type: deliveryType,
-      payment_method: paymentMethod,
-      use_loyalty_points: useLoyalty ? loyaltyPoints : undefined,
-      notes: notes || undefined,
+      address_id:          selectedAddressId ?? undefined,
+      delivery_type:       deliveryType,
+      payment_method:      paymentMethod,
+      use_loyalty_points:  useLoyalty ? loyaltyPoints : undefined,
+      notes:               notes || undefined,
     }),
-    onSuccess: ({ data }: any) => {
-      setCreatedOrderId(data.order.id)
+    onSuccess: (res: any) => {
+      const order = res.order ?? res.data?.order ?? res
+      setCreatedOrder({ id: order.id, reference: order.reference, total: order.total })
       setStep('confirm')
       queryClient.invalidateQueries({ queryKey: ['cart'] })
       queryClient.invalidateQueries({ queryKey: ['orders'] })
     },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message ?? 'Erreur lors de la commande')
-    },
-  })
-
-  const initPaymentMutation = useMutation({
-    mutationFn: (orderId: number) => orderApi.initPayment(orderId, paymentMethod, user?.phone),
-    onSuccess: ({ data }: any) => {
-      if (data.payment_url) window.location.href = data.payment_url
-    },
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? e?.message ?? 'Erreur lors de la commande'),
   })
 
   const loyaltyDiscount = useLoyalty ? loyaltyPoints / 100 : 0
-  const finalTotal = Math.max(0, (summary?.total ?? 0) - loyaltyDiscount)
+  const baseTotal       = summary?.total ?? 0
+  const finalTotal      = Math.max(0, baseTotal - loyaltyDiscount)
+  const maxLoyalty      = Math.min((user as any)?.loyalty_points ?? 0, baseTotal * 100)
 
-  if (!cart?.items?.length && step !== 'confirm') {
+  const items = cart?.items ?? []
+
+  // État de chargement
+  if (cartLoading || addressesLoading) {
+    return (
+      <div className="ck-font-body" style={{ background: '#faf7f2', minHeight: '100vh' }}>
+        <style dangerouslySetInnerHTML={{ __html: PAGE_STYLES }} />
+        <div className="container-app py-20 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: '#e8820c' }} />
+          <p className="text-sm" style={{ color: '#8b5e3c' }}>Chargement de votre commande...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Vérifier que le panier n'est pas vide après chargement
+  if (!cartLoading && (!cart || items.length === 0) && step !== 'confirm') {
     return (
       <div className="ck-font-body" style={{ background: '#faf7f2', minHeight: '100vh' }}>
         <style dangerouslySetInnerHTML={{ __html: PAGE_STYLES }} />
@@ -324,35 +350,31 @@ export default function CheckoutPage() {
       <style dangerouslySetInnerHTML={{ __html: PAGE_STYLES }} />
 
       <div className="container-app py-6 sm:py-10 max-w-5xl">
-
         {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 text-xs mb-6"
-          style={{ color: '#8b5e3c', opacity: 0.7 }}>
+        <div className="flex items-center gap-1.5 text-xs mb-6" style={{ color: '#8b5e3c', opacity: 0.7 }}>
           <Home className="h-3 w-3" />
           <ChevronRight className="h-3 w-3 opacity-50" />
           <span className="font-semibold" style={{ color: '#1a1209', opacity: 1 }}>Commande</span>
         </div>
 
-        {/* Title */}
         <h1 className="ck-font-display ck-section-line font-black mb-8"
           style={{ fontSize: 'clamp(22px, 4vw, 30px)', color: '#1a1209' }}>
           Finaliser ma commande
         </h1>
 
-        {/* Step indicator */}
         <StepIndicator current={step} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           <div className="lg:col-span-2">
             <AnimatePresence mode="wait">
 
-              {/* ─────────────────────────────── DELIVERY ─── */}
+              {/* ── DELIVERY ── */}
               {step === 'delivery' && (
                 <motion.div key="delivery"
                   initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
                   className="space-y-5">
 
-                  {/* Delivery mode */}
+                  {/* Mode livraison */}
                   <div className="ck-card">
                     <h2 className="ck-font-display font-black text-lg mb-5 flex items-center gap-2"
                       style={{ color: '#1a1209' }}>
@@ -367,8 +389,7 @@ export default function CheckoutPage() {
                         { v: 'home',          Icon: Home,  label: 'Livraison à domicile', desc: '24–48h · 2 000 FCFA (gratuit dès 50 000 FCFA)' },
                         { v: 'click_collect', Icon: Store, label: 'Click & Collect',       desc: 'Retrait gratuit — Magasin Koumassi' },
                       ].map(({ v, Icon, label, desc }) => (
-                        <label key={v}
-                          className={`ck-option ${deliveryType === v ? 'selected' : ''}`}
+                        <label key={v} className={`ck-option ${deliveryType === v ? 'selected' : ''}`}
                           onClick={() => setDeliveryType(v)}>
                           <input type="radio" className="ck-radio" checked={deliveryType === v} onChange={() => setDeliveryType(v)} />
                           <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
@@ -384,7 +405,7 @@ export default function CheckoutPage() {
                     </div>
                   </div>
 
-                  {/* Address */}
+                  {/* Adresse */}
                   {deliveryType === 'home' && (
                     <div className="ck-card">
                       <h2 className="ck-font-display font-black text-lg mb-5 flex items-center gap-2"
@@ -396,15 +417,19 @@ export default function CheckoutPage() {
                         Adresse de livraison
                       </h2>
                       <div className="space-y-3">
-                        {addresses?.map((addr: any) => (
+                        {(addresses as any[] ?? []).map((addr: any) => (
                           <label key={addr.id}
                             className={`ck-option ${selectedAddressId === addr.id ? 'selected' : ''}`}
                             onClick={() => setSelectedAddressId(addr.id)}>
                             <input type="radio" name="address" className="ck-radio"
                               checked={selectedAddressId === addr.id} onChange={() => setSelectedAddressId(addr.id)} />
                             <div className="min-w-0">
-                              <p className="ck-font-body font-bold text-sm" style={{ color: '#1a1209' }}>{addr.recipient_name}</p>
-                              <p className="ck-font-body text-xs mt-0.5" style={{ color: '#8b5e3c', opacity: 0.75 }}>{addr.address_line1}</p>
+                              <p className="ck-font-body font-bold text-sm" style={{ color: '#1a1209' }}>
+                                {addr.recipient_name ?? addr.label}
+                              </p>
+                              <p className="ck-font-body text-xs mt-0.5" style={{ color: '#8b5e3c', opacity: 0.75 }}>
+                                {addr.address_line1 ?? addr.address}
+                              </p>
                               <p className="ck-font-body text-xs" style={{ color: '#8b5e3c', opacity: 0.75 }}>
                                 {addr.district && `${addr.district}, `}{addr.city}
                               </p>
@@ -419,8 +444,7 @@ export default function CheckoutPage() {
                           </label>
                         ))}
 
-                        <button
-                          onClick={() => setShowNewAddress(!showNewAddress)}
+                        <button onClick={() => setShowNewAddress(!showNewAddress)}
                           className="ck-font-body w-full py-3 flex items-center justify-center gap-2 text-sm font-semibold rounded-2xl border-2 border-dashed transition-all hover:border-opacity-60"
                           style={{ borderColor: 'rgba(139,94,60,0.25)', color: '#8b5e3c' }}>
                           <Plus className="h-4 w-4" />
@@ -431,20 +455,26 @@ export default function CheckoutPage() {
                       <AnimatePresence>
                         {showNewAddress && (
                           <motion.form
-                            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
                             onSubmit={handleSubmit(d => createAddressMutation.mutate(d))}
                             className="mt-4 space-y-3 overflow-hidden"
                             style={{ borderTop: '1px solid rgba(139,94,60,0.1)', paddingTop: 16 }}>
                             <div className="grid grid-cols-2 gap-3">
-                              <Input {...register('recipient_name')} label="Nom complet" placeholder="Jean Kouassi" error={errors.recipient_name?.message} />
-                              <Input {...register('phone')} label="Téléphone" placeholder="+225 07 00 00 00" error={errors.phone?.message} />
+                              <Input {...register('recipient_name')} label="Nom complet" placeholder="Jean Kouassi"
+                                error={errors.recipient_name?.message} />
+                              <Input {...register('phone')} label="Téléphone" placeholder="+225 07 00 00 00"
+                                error={errors.phone?.message} />
                             </div>
-                            <Input {...register('address_line1')} label="Adresse" placeholder="Rue des Combattants" error={errors.address_line1?.message} />
+                            <Input {...register('address_line1')} label="Adresse" placeholder="Rue des Combattants"
+                              error={errors.address_line1?.message} />
                             <div className="grid grid-cols-2 gap-3">
                               <Input {...register('district')} label="Quartier" placeholder="Koumassi" />
-                              <Input {...register('city')} label="Ville" placeholder="Abidjan" error={errors.city?.message} />
+                              <Input {...register('city')} label="Ville" placeholder="Abidjan"
+                                error={errors.city?.message} />
                             </div>
-                            <Button type="submit" variant="orange" size="sm" loading={createAddressMutation.isPending}>
+                            <Button type="submit" variant="orange" size="sm"
+                              loading={createAddressMutation.isPending}>
                               Enregistrer l'adresse
                             </Button>
                           </motion.form>
@@ -454,7 +484,8 @@ export default function CheckoutPage() {
                   )}
 
                   <div className="flex gap-3">
-                    <Button variant="ghost" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/cart')}>
+                    <Button variant="ghost" leftIcon={<ArrowLeft className="h-4 w-4" />}
+                      onClick={() => navigate('/cart')}>
                       Retour
                     </Button>
                     <Button variant="orange" size="lg" className="flex-1"
@@ -467,7 +498,7 @@ export default function CheckoutPage() {
                 </motion.div>
               )}
 
-              {/* ─────────────────────────────── PAYMENT ─── */}
+              {/* ── PAYMENT ── */}
               {step === 'payment' && (
                 <motion.div key="payment"
                   initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
@@ -487,8 +518,7 @@ export default function CheckoutPage() {
                         { v: 'cinetpay', label: 'CinetPay',  desc: 'Orange Money · MTN · Wave · Moov · Carte bancaire' },
                         { v: 'paydunya', label: 'PayDunya',   desc: 'Mobile Money multi-opérateurs Afrique de l\'Ouest' },
                       ].map(({ v, label, desc }) => (
-                        <label key={v}
-                          className={`ck-option ${paymentMethod === v ? 'selected' : ''}`}
+                        <label key={v} className={`ck-option ${paymentMethod === v ? 'selected' : ''}`}
                           onClick={() => setPaymentMethod(v)}>
                           <input type="radio" className="ck-radio" checked={paymentMethod === v} onChange={() => setPaymentMethod(v)} />
                           <div>
@@ -500,8 +530,8 @@ export default function CheckoutPage() {
                     </div>
                   </div>
 
-                  {/* Loyalty */}
-                  {user && user.loyalty_points >= 100 && (
+                  {/* Points fidélité */}
+                  {user && (user as any).loyalty_points >= 100 && (
                     <div className="ck-card">
                       <div className="flex items-center gap-3">
                         <input type="checkbox" id="loyalty-check" checked={useLoyalty}
@@ -511,17 +541,16 @@ export default function CheckoutPage() {
                           className="ck-font-body text-sm font-semibold cursor-pointer flex items-center gap-1.5"
                           style={{ color: '#1a1209' }}>
                           <Star className="h-4 w-4 fill-current" style={{ color: '#e8820c' }} />
-                          Utiliser {user.loyalty_points.toLocaleString('fr-CI')} points
+                          Utiliser {((user as any).loyalty_points as number).toLocaleString('fr-CI')} points
                           <span className="ck-font-body text-xs font-normal" style={{ color: '#8b5e3c', opacity: 0.65 }}>
-                            ({formatCurrency(user.loyalty_points / 100)} de réduction)
+                            ({formatCurrency((user as any).loyalty_points / 100)} de réduction)
                           </span>
                         </label>
                       </div>
                       {useLoyalty && (
                         <div className="mt-3">
                           <Input type="number" label="Points à utiliser"
-                            value={loyaltyPoints} min={100}
-                            max={Math.min(user.loyalty_points, (summary?.total ?? 0) * 100)}
+                            value={loyaltyPoints} min={100} max={maxLoyalty}
                             onChange={(e: any) => setLoyaltyPoints(Number(e.target.value))}
                             hint="100 points = 1 FCFA de réduction" />
                         </div>
@@ -534,16 +563,10 @@ export default function CheckoutPage() {
                     <h3 className="ck-font-body font-bold text-sm mb-3" style={{ color: '#1a1209' }}>
                       Note pour le livreur (optionnel)
                     </h3>
-                    <textarea
-                      className="ck-textarea"
-                      value={notes}
-                      onChange={e => setNotes(e.target.value)}
-                      placeholder="Sonner 2 fois, laisser au gardien..."
-                      rows={3}
-                    />
+                    <textarea className="ck-textarea" value={notes} onChange={e => setNotes(e.target.value)}
+                      placeholder="Sonner 2 fois, laisser au gardien…" rows={3} />
                   </div>
 
-                  {/* Info */}
                   <div className="flex items-start gap-3 px-4 py-3 rounded-2xl"
                     style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
                     <Shield className="h-4 w-4 shrink-0 mt-0.5" style={{ color: '#2563eb' }} />
@@ -565,8 +588,8 @@ export default function CheckoutPage() {
                 </motion.div>
               )}
 
-              {/* ─────────────────────────────── CONFIRM ─── */}
-              {step === 'confirm' && !createdOrderId && (
+              {/* ── CONFIRM (récapitulatif avant paiement) ── */}
+              {step === 'confirm' && !createdOrder && (
                 <motion.div key="confirm-review"
                   initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
                   className="space-y-5">
@@ -576,36 +599,39 @@ export default function CheckoutPage() {
                       Récapitulatif final
                     </h2>
 
-                    {/* Items list */}
                     <div className="space-y-2 mb-5 max-h-64 overflow-y-auto ck-scrollbar">
-                      {cart?.items?.map((item: any) => (
-                        <div key={item.id} className="flex items-center gap-3 py-2.5"
-                          style={{ borderBottom: '1px solid rgba(139,94,60,0.07)' }}>
-                          <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0"
-                            style={{ background: '#f5efe6', border: '1px solid rgba(139,94,60,0.1)' }}>
-                            {item.product?.primary_image_url
-                              ? <img src={item.product.primary_image_url} alt="" className="w-full h-full object-cover" />
-                              : <div className="h-full flex items-center justify-center">
-                                  <Package className="h-5 w-5" style={{ color: '#8b5e3c', opacity: 0.25 }} />
-                                </div>
-                            }
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="ck-font-body text-sm font-semibold truncate" style={{ color: '#1a1209' }}>
-                              {item.product?.name}
+                      {items.map(item => {
+                        const imgUrl    = getCartItemImageUrl(item)
+                        const unitPrice = item.price ?? item.product?.price ?? 0
+                        const lineTotal = item.line_total ?? unitPrice * item.quantity
+                        return (
+                          <div key={item.id} className="flex items-center gap-3 py-2.5"
+                            style={{ borderBottom: '1px solid rgba(139,94,60,0.07)' }}>
+                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0"
+                              style={{ background: '#f5efe6', border: '1px solid rgba(139,94,60,0.1)' }}>
+                              {imgUrl
+                                ? <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                                : <div className="h-full flex items-center justify-center">
+                                    <Package className="h-5 w-5" style={{ color: '#8b5e3c', opacity: 0.25 }} />
+                                  </div>
+                              }
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="ck-font-body text-sm font-semibold truncate" style={{ color: '#1a1209' }}>
+                                {item.product?.name ?? `Produit #${item.product_id}`}
+                              </p>
+                              <p className="ck-font-body text-xs" style={{ color: '#8b5e3c', opacity: 0.6 }}>
+                                ×{item.quantity} · {formatCurrency(unitPrice)}/u
+                              </p>
+                            </div>
+                            <p className="ck-font-body font-bold text-sm shrink-0" style={{ color: '#1a1209' }}>
+                              {formatCurrency(lineTotal)}
                             </p>
-                            <p className="ck-font-body text-xs" style={{ color: '#8b5e3c', opacity: 0.6 }}>
-                              ×{item.quantity} · {formatCurrency(item.price)}/u
-                            </p>
                           </div>
-                          <p className="ck-font-body font-bold text-sm shrink-0" style={{ color: '#1a1209' }}>
-                            {formatCurrency(item.line_total)}
-                          </p>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
 
-                    {/* Summary totals */}
                     <div className="rounded-2xl p-4 space-y-2.5"
                       style={{ background: '#faf7f2', border: '1px solid rgba(139,94,60,0.1)' }}>
                       <div className="ck-summary-row">
@@ -617,7 +643,7 @@ export default function CheckoutPage() {
                       {(summary?.coupon_discount ?? 0) > 0 && (
                         <div className="ck-summary-row">
                           <span className="ck-font-body text-sm" style={{ color: '#16a34a' }}>
-                            Code promo ({summary!.coupon_code})
+                            Code promo {summary?.coupon_code && `(${summary.coupon_code})`}
                           </span>
                           <span className="ck-font-body text-sm font-bold" style={{ color: '#16a34a' }}>
                             -{formatCurrency(summary!.coupon_discount)}
@@ -641,8 +667,7 @@ export default function CheckoutPage() {
                           {(summary?.delivery_fee ?? 0) === 0 ? 'Gratuite' : formatCurrency(summary!.delivery_fee)}
                         </span>
                       </div>
-                      <div className="ck-summary-row pt-2"
-                        style={{ borderTop: '1px solid rgba(139,94,60,0.12)' }}>
+                      <div className="ck-summary-row pt-2" style={{ borderTop: '1px solid rgba(139,94,60,0.12)' }}>
                         <span className="ck-font-display font-black text-base" style={{ color: '#1a1209' }}>TOTAL</span>
                         <span className="ck-font-display font-black text-xl" style={{ color: '#dc2626' }}>
                           {formatCurrency(finalTotal)}
@@ -665,8 +690,8 @@ export default function CheckoutPage() {
                 </motion.div>
               )}
 
-              {/* ─────────────────────────────── SUCCESS ─── */}
-              {step === 'confirm' && createdOrderId && (
+              {/* SUCCÈS — order créée, redirection vers la page commande */}
+              {step === 'confirm' && createdOrder && (
                 <motion.div key="success"
                   initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                   className="ck-card text-center py-12">
@@ -677,21 +702,27 @@ export default function CheckoutPage() {
                     style={{ background: '#f0fdf4', border: '2px solid #bbf7d0' }}>
                     <CheckCircle className="h-10 w-10" style={{ color: '#16a34a' }} />
                   </motion.div>
-                  <h2 className="ck-font-display font-black text-2xl mb-3" style={{ color: '#1a1209' }}>
-                    Commande créée
+                  <h2 className="ck-font-display font-black text-2xl mb-2" style={{ color: '#1a1209' }}>
+                    Commande confirmée !
                   </h2>
-                  <p className="ck-font-body text-sm max-w-sm mx-auto mb-8" style={{ color: '#8b5e3c', opacity: 0.75 }}>
-                    Cliquez sur "Payer maintenant" pour finaliser via {paymentMethod === 'cinetpay' ? 'CinetPay' : 'PayDunya'}.
+                  <p className="ck-font-body text-sm max-w-sm mx-auto mb-2" style={{ color: '#8b5e3c', opacity: 0.75 }}>
+                    Commande <span className="font-bold">#{createdOrder.reference}</span>
+                  </p>
+                  <p className="ck-font-display font-black text-xl mb-8" style={{ color: '#dc2626' }}>
+                    {formatCurrency(createdOrder.total)}
+                  </p>
+                  <p className="ck-font-body text-xs mb-6" style={{ color: '#8b5e3c', opacity: 0.6 }}>
+                    Vous allez recevoir une confirmation par SMS/email.<br />
+                    Vous serez redirigé vers le prestataire de paiement.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button variant="orange" size="lg"
-                      loading={initPaymentMutation.isPending}
                       leftIcon={<CreditCard className="h-4 w-4" />}
-                      onClick={() => initPaymentMutation.mutate(createdOrderId)}>
-                      Payer maintenant
+                      onClick={() => navigate(`/orders/${createdOrder.id}`)}>
+                      Suivre ma commande
                     </Button>
-                    <Button variant="secondary" onClick={() => navigate(`/orders/${createdOrderId}`)}>
-                      Voir ma commande
+                    <Button variant="secondary" onClick={() => navigate('/catalogue')}>
+                      Continuer mes achats
                     </Button>
                   </div>
                 </motion.div>
@@ -700,7 +731,7 @@ export default function CheckoutPage() {
           </div>
 
           {/* Sidebar */}
-          {step !== 'confirm' && (
+          {step !== 'confirm' && cart && summary && (
             <div className="lg:sticky lg:top-24 lg:self-start">
               <CartSidebar
                 cart={cart}

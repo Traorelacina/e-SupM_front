@@ -2,33 +2,35 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ShoppingBag, Users,
   Tag, BarChart3, LogOut, ChevronRight, Bell,
-  TrendingUp, AlertTriangle, RefreshCw,
+  AlertTriangle, RefreshCw, BookOpen,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/stores/authStore'
 import { getInitials } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/orders', icon: ShoppingBag, label: 'Commandes' },
-  { to: '/admin/products', icon: Package, label: 'Produits' },
-  { to: '/admin/subscriptions', icon: RefreshCw, label: 'Abonnements' },
-   { to: '/admin/selections', icon: Tag, label: 'Sélections' },
-  { to: '/admin/charity', icon: AlertTriangle, label: 'Solidarité' },
-  { to: '/admin/users', icon: Users, label: 'Utilisateurs' },
-  { to: '/admin/stats', icon: BarChart3, label: 'Statistiques' },
-  
+  { to: '/admin',               icon: LayoutDashboard, label: 'Dashboard',    end: true },
+  { to: '/admin/orders',        icon: ShoppingBag,     label: 'Commandes' },
+  { to: '/admin/products',      icon: Package,         label: 'Produits' },
+  { to: '/admin/subscriptions', icon: RefreshCw,       label: 'Abonnements' },
+  { to: '/admin/selections',    icon: Tag,             label: 'Sélections' },
+  { to: '/admin/charity',       icon: AlertTriangle,   label: 'Solidarité' },
+  { to: '/admin/conseils',      icon: BookOpen,        label: 'Nos Conseils' },
+  { to: '/admin/users',         icon: Users,           label: 'Utilisateurs' },
+  { to: '/admin/stats',         icon: BarChart3,       label: 'Statistiques' },
 ]
 
 export default function AdminLayout() {
   const { logout } = useAuth()
-  const { user } = useAuthStore()
-  const navigate = useNavigate()
+  const { user }   = useAuthStore()
+  const navigate   = useNavigate()
 
   return (
     <div className="flex h-screen bg-stone-50 overflow-hidden">
-      {/* Sidebar */}
+
+      {/* ── Sidebar ── */}
       <aside className="w-60 bg-stone-900 flex flex-col shrink-0">
+
         {/* Logo */}
         <div className="h-16 flex items-center gap-3 px-5 border-b border-stone-800">
           <div className="w-8 h-8 rounded-xl bg-brand-orange flex items-center justify-center border border-brand-red shrink-0">
@@ -82,12 +84,15 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      {/* Main */}
+      {/* ── Main ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
+
         {/* Top bar */}
         <header className="h-16 bg-white border-b border-stone-200 flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-2 text-sm text-stone-500">
-            <span className="cursor-pointer hover:text-brand-orange" onClick={() => navigate('/')}>e-Sup'M</span>
+            <span className="cursor-pointer hover:text-brand-orange" onClick={() => navigate('/')}>
+              e-Sup'M
+            </span>
             <ChevronRight className="h-3.5 w-3.5" />
             <span className="text-stone-900 font-semibold">Administration</span>
           </div>
