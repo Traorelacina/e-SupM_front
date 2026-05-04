@@ -438,6 +438,7 @@ export interface Subscription {
   items?: SubscriptionItem[];
   orders?: Order[];
   address?: Address;
+  deleted_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -452,8 +453,6 @@ export interface SubscriptionItem {
 }
 
 // ==================== CONSEILS (Nos Conseils) ====================
-
-// ─── Types pour les conseils ─────────────────────────────────────
 
 export type ConseilCategory = 'nutrition' | 'astuce' | 'recette';
 export type ConseilContentType = 'text' | 'video' | 'image' | 'mixed';
@@ -523,10 +522,535 @@ export interface ConseilStatsResponse {
   recette: number;
 }
 
+// ==================== GAMES ====================
+
+export type GameDefiStatus = 'draft' | 'active' | 'voting' | 'closed';
+export type QuizSessionStatus = 'draft' | 'active' | 'closed';
+export type BattleContestStatus = 'draft' | 'active' | 'closed';
+export type JustePrixStatus = 'draft' | 'active' | 'closed';
+export type ScratchTriggerType = 'purchase' | 'charity' | 'manual';
+export type ScratchPrizeType = 'product' | 'points' | 'voucher' | 'delivery' | 'travel' | 'hotel' | 'empty';
+export type WheelType = 'wholesale' | 'standard';
+export type BattleContestType = 'promo' | 'product' | 'team';
+export type QuizQuestionType = 'multiple_choice' | 'true_false' | 'text_input';
+
+export interface GameDefiParticipant {
+  id: number;
+  game_defi_id: number;
+  user_id: number;
+  user?: Pick<User, 'id' | 'name' | 'email'> & { avatar?: string };
+  submission_text?: string | null;
+  submission_image?: string | null;
+  submission_video_url?: string | null;
+  votes_count: number;
+  is_selected: boolean;
+  is_winner: boolean;
+  prize_claimed: boolean;
+  earned_at?: string | null;
+  admin_note?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GameDefi {
+  id: number;
+  title: string;
+  description?: string | null;
+  challenge_text: string;
+  challenge_video_url?: string | null;
+  image?: string | null;
+  status: GameDefiStatus;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  voting_ends_at?: string | null;
+  winner_participant_id?: number | null;
+  prize_description?: string | null;
+  prize_image?: string | null;
+  loyalty_points_prize: number;
+  participants_count?: number;
+  selected_count?: number;
+  participants?: GameDefiParticipant[];
+  winner?: GameDefiParticipant | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScratchCard {
+  id: number;
+  user_id: number;
+  user?: Pick<User, 'id' | 'name' | 'email'>;
+  month_year: string;
+  trigger_type: ScratchTriggerType;
+  trigger_amount: number;
+  is_scratched: boolean;
+  scratched_at?: string | null;
+  prize_type?: ScratchPrizeType | null;
+  prize_label?: string | null;
+  prize_value: number;
+  prize_description?: string | null;
+  prize_image?: string | null;
+  prize_claimed: boolean;
+  prize_claimed_at?: string | null;
+  expires_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScratchCardStats {
+  by_type: { prize_type: string; count: number; claimed: number }[];
+  monthly: { month_year: string; issued: number; scratched: number }[];
+  totals: { issued: number; scratched: number; prizes_unclaimed: number };
+}
+
+export interface WheelPrize {
+  label: string;
+  type: string;
+  value: number;
+  weight: number;
+  color?: string;
+}
+
+export interface WheelConfig {
+  id: number;
+  name: string;
+  wheel_type: WheelType;
+  min_purchase_amount: number;
+  spins_per_month: number;
+  is_active: boolean;
+  prizes: WheelPrize[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WheelSpin {
+  id: number;
+  user_id: number;
+  user?: Pick<User, 'id' | 'name' | 'email'>;
+  wheel_config_id: number;
+  wheel_config?: Pick<WheelConfig, 'id' | 'name' | 'wheel_type'>;
+  month_year: string;
+  spin_number: number;
+  prize_label: string;
+  prize_type: string;
+  prize_value: number;
+  prize_claimed: boolean;
+  prize_claimed_at?: string | null;
+  triggered_by: 'purchase_threshold' | 'manual_admin';
+  trigger_order_id?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuizOption {
+  id: number;
+  quiz_question_id: number;
+  option_text: string;
+  option_image?: string | null;
+  is_correct: boolean;
+  order: number;
+}
+
+export interface QuizQuestion {
+  id: number;
+  quiz_session_id: number;
+  question_text: string;
+  question_image?: string | null;
+  type: QuizQuestionType;
+  points: number;
+  order: number;
+  explanation?: string | null;
+  options?: QuizOption[];
+}
+
+export interface QuizParticipation {
+  id: number;
+  quiz_session_id: number;
+  user_id: number;
+  user?: Pick<User, 'id' | 'name' | 'email'>;
+  score: number;
+  total_points: number;
+  answers?: any;
+  time_taken_seconds?: number | null;
+  completed_at?: string | null;
+  won: boolean;
+  prize_description?: string | null;
+  loyalty_points_won: number;
+  next_retry_at?: string | null;
+  created_at: string;
+}
+
+export interface QuizSession {
+  id: number;
+  title: string;
+  theme: string;
+  description?: string | null;
+  image?: string | null;
+  status: QuizSessionStatus;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  time_limit_seconds: number;
+  prize_description?: string | null;
+  prize_image?: string | null;
+  loyalty_points_prize: number;
+  min_score_to_win: number;
+  retry_delay_hours: number;
+  questions_count?: number;
+  participations_count?: number;
+  winners_count?: number;
+  questions?: QuizQuestion[];
+  participations?: QuizParticipation[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BattleCandidate {
+  id: number;
+  battle_contest_id: number;
+  name: string;
+  image?: string | null;
+  description?: string | null;
+  votes_count: number;
+  order: number;
+}
+
+export interface BattleContest {
+  id: number;
+  title: string;
+  type: BattleContestType;
+  description?: string | null;
+  image?: string | null;
+  status: BattleContestStatus;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  winner_candidate_id?: number | null;
+  prize_description?: string | null;
+  loyalty_points_prize: number;
+  votes_count?: number;
+  candidates?: BattleCandidate[];
+  winner?: BattleCandidate | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JustePrix {
+  id: number;
+  title: string;
+  status: JustePrixStatus;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  prize_description?: string | null;
+  prize_image?: string | null;
+  loyalty_points_prize: number;
+  tolerance_percent: number;
+  participations_count?: number;
+  winners_count?: number;
+  participations?: JustePrixParticipation[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JustePrixParticipation {
+  id: number;
+  juste_prix_id: number;
+  user_id: number;
+  user?: Pick<User, 'id' | 'name' | 'email'>;
+  product_id: number;
+  product?: Pick<Product, 'id' | 'name' | 'price'> & { primary_image?: ProductImage };
+  correct_price: number;
+  guessed_price?: number | null;
+  time_limit_seconds: number;
+  time_taken_seconds?: number | null;
+  is_correct: boolean;
+  is_close: boolean;
+  won: boolean;
+  prize_description?: string | null;
+  loyalty_points_won: number;
+  next_allowed_at?: string | null;
+  completed_at?: string | null;
+  created_at: string;
+}
+
+export interface GameDashboardStats {
+  defis: {
+    total: number;
+    active: number;
+    voting: number;
+    participants_this_week: number;
+  };
+  scratch_cards: {
+    issued: number;
+    scratched: number;
+    pending: number;
+    prizes_unclaimed: number;
+  };
+  wheel: {
+    spins_this_month: number;
+    prizes_unclaimed: number;
+    configs: number;
+  };
+  quiz: {
+    sessions: number;
+    active: number;
+    participations: number;
+    winners: number;
+  };
+  battle: {
+    total: number;
+    active: number;
+    votes_today: number;
+  };
+  juste_prix: {
+    sessions: number;
+    participations: number;
+    winners: number;
+  };
+}
+
+// ─── API Admin Games ─────────────────────────────────────────────
+
+export const adminGameApi = {
+  // Tableau de bord
+  dashboard: () =>
+    get<{ success: boolean; stats: GameDashboardStats }>('/admin/games/dashboard'),
+
+  // ── Défis ────────────────────────────────────────────────────────
+  defis: {
+    list: (params?: { page?: number; per_page?: number }) =>
+      get<{ success: boolean; data: PaginatedResponse<GameDefi> }>('/admin/games/defis', params as any),
+
+    get: (id: number) =>
+      get<{ success: boolean; data: GameDefi }>(`/admin/games/defis/${id}`),
+
+    create: (data: {
+      title: string;
+      challenge_text: string;
+      description?: string;
+      challenge_video_url?: string;
+      starts_at: string;
+      ends_at: string;
+      voting_ends_at: string;
+      prize_description?: string;
+      loyalty_points_prize?: number;
+    }) => post<{ success: boolean; data: GameDefi }>('/admin/games/defis', data),
+
+    update: (id: number, data: Partial<GameDefi>) =>
+      put<{ success: boolean; message: string; data: GameDefi }>(`/admin/games/defis/${id}`, data),
+
+    delete: (id: number) =>
+      del<{ success: boolean; message: string }>(`/admin/games/defis/${id}`),
+
+    setStatus: (id: number, status: GameDefiStatus) =>
+      patch<{ success: boolean; message: string }>(`/admin/games/defis/${id}/status`, { status }),
+
+    selectParticipants: (id: number, participant_ids: number[]) =>
+      post<{ success: boolean; message: string }>(`/admin/games/defis/${id}/select-participants`, { participant_ids }),
+
+    awardWinner: (id: number, participant_id: number) =>
+      post<{ success: boolean; message: string }>(`/admin/games/defis/${id}/award-winner`, { participant_id }),
+  },
+
+  // ── Carte à gratter ──────────────────────────────────────────────
+  scratch: {
+    list: (params?: {
+      trigger_type?: ScratchTriggerType;
+      is_scratched?: boolean;
+      month_year?: string;
+      page?: number;
+    }) => get<{ success: boolean; data: PaginatedResponse<ScratchCard> }>('/admin/games/scratch-cards', params as any),
+
+    stats: () =>
+      get<{ success: boolean; data: ScratchCardStats }>('/admin/games/scratch-cards/stats'),
+
+    triggerManual: (data: { user_id: number; trigger_type: ScratchTriggerType; reason?: string }) =>
+      post<{ success: boolean; message: string; data: ScratchCard }>('/admin/games/scratch-cards/trigger-manual', data),
+
+    claimPrize: (id: number) =>
+      patch<{ success: boolean; message: string }>(`/admin/games/scratch-cards/${id}/claim`, {}),
+  },
+
+  // ── Roue e-Sup'M ─────────────────────────────────────────────────
+  wheel: {
+    configs: () =>
+      get<{ success: boolean; data: WheelConfig[] }>('/admin/games/wheel/configs'),
+
+    createConfig: (data: {
+      name: string;
+      wheel_type: WheelType;
+      min_purchase_amount: number;
+      spins_per_month: number;
+      prizes?: WheelPrize[];
+      is_active?: boolean;
+    }) => post<{ success: boolean; data: WheelConfig }>('/admin/games/wheel/configs', data),
+
+    updateConfig: (id: number, data: Partial<WheelConfig>) =>
+      put<{ success: boolean; message: string }>(`/admin/games/wheel/configs/${id}`, data),
+
+    spins: (params?: {
+      wheel_type?: WheelType;
+      month_year?: string;
+      prize_claimed?: boolean;
+      page?: number;
+    }) => get<{ success: boolean; data: PaginatedResponse<WheelSpin> }>('/admin/games/wheel/spins', params as any),
+
+    spinManual: (data: { user_id: number; wheel_config_id: number }) =>
+      post<{ success: boolean; message: string; data: { spin: WheelSpin; prize: WheelPrize } }>(
+        '/admin/games/wheel/spin-manual',
+        data
+      ),
+
+    claimPrize: (id: number) =>
+      patch<{ success: boolean; message: string }>(`/admin/games/wheel/spins/${id}/claim`, {}),
+  },
+
+  // ── Quiz ──────────────────────────────────────────────────────────
+  quiz: {
+    list: (params?: { page?: number; per_page?: number }) =>
+      get<{ success: boolean; data: PaginatedResponse<QuizSession> }>('/admin/games/quiz', params as any),
+
+    get: (id: number) =>
+      get<{ success: boolean; data: QuizSession }>(`/admin/games/quiz/${id}`),
+
+    create: (data: {
+      title: string;
+      theme: string;
+      description?: string;
+      starts_at: string;
+      ends_at: string;
+      time_limit_seconds: number;
+      prize_description?: string;
+      loyalty_points_prize?: number;
+      min_score_to_win?: number;
+      retry_delay_hours?: number;
+    }) => post<{ success: boolean; data: QuizSession }>('/admin/games/quiz', data),
+
+    update: (id: number, data: Partial<QuizSession>) =>
+      put<{ success: boolean; message: string }>(`/admin/games/quiz/${id}`, data),
+
+    delete: (id: number) =>
+      del<{ success: boolean; message: string }>(`/admin/games/quiz/${id}`),
+
+    setStatus: (id: number, status: QuizSessionStatus) =>
+      patch<{ success: boolean; message: string }>(`/admin/games/quiz/${id}/status`, { status }),
+
+    addQuestion: (
+      id: number,
+      data: {
+        question_text: string;
+        type: QuizQuestionType;
+        points?: number;
+        explanation?: string;
+        options?: { text: string; is_correct: boolean }[];
+      }
+    ) => post<{ success: boolean; data: QuizQuestion }>(`/admin/games/quiz/${id}/questions`, data),
+
+    updateQuestion: (id: number, questionId: number, data: Partial<QuizQuestion> & { options?: { text: string; is_correct: boolean }[] }) =>
+      put<{ success: boolean; message: string; data: QuizQuestion }>(
+        `/admin/games/quiz/${id}/questions/${questionId}`,
+        data
+      ),
+
+    deleteQuestion: (id: number, questionId: number) =>
+      del<{ success: boolean; message: string }>(`/admin/games/quiz/${id}/questions/${questionId}`),
+
+    participations: (id: number, params?: { page?: number }) =>
+      get<{ success: boolean; data: PaginatedResponse<QuizParticipation> }>(
+        `/admin/games/quiz/${id}/participations`,
+        params as any
+      ),
+  },
+
+  // ── Battle / Vote ─────────────────────────────────────────────────
+  battle: {
+    list: (params?: { page?: number; per_page?: number }) =>
+      get<{ success: boolean; data: PaginatedResponse<BattleContest> }>('/admin/games/battle', params as any),
+
+    get: (id: number) =>
+      get<{ success: boolean; data: BattleContest }>(`/admin/games/battle/${id}`),
+
+    create: (data: {
+      title: string;
+      type: BattleContestType;
+      description?: string;
+      starts_at: string;
+      ends_at: string;
+      prize_description?: string;
+      loyalty_points_prize?: number;
+      candidates: { name: string; description?: string }[];
+    }) => post<{ success: boolean; data: BattleContest }>('/admin/games/battle', data),
+
+    update: (id: number, data: Partial<BattleContest>) =>
+      put<{ success: boolean; message: string }>(`/admin/games/battle/${id}`, data),
+
+    delete: (id: number) =>
+      del<{ success: boolean; message: string }>(`/admin/games/battle/${id}`),
+
+    setStatus: (id: number, status: BattleContestStatus) =>
+      patch<{ success: boolean; message: string }>(`/admin/games/battle/${id}/status`, { status }),
+
+    close: (id: number) =>
+      post<{ success: boolean; message: string; winner: BattleCandidate | null }>(
+        `/admin/games/battle/${id}/close`
+      ),
+
+    addCandidate: (id: number, data: { name: string; description?: string }) =>
+      post<{ success: boolean; data: BattleCandidate }>(`/admin/games/battle/${id}/candidates`, data),
+
+    votes: (id: number, params?: { page?: number }) =>
+      get<{ success: boolean; data: PaginatedResponse<any> }>(
+        `/admin/games/battle/${id}/votes`,
+        params as any
+      ),
+  },
+
+  // ── Juste Prix ────────────────────────────────────────────────────
+  justePrix: {
+    list: (params?: { page?: number; per_page?: number }) =>
+      get<{ success: boolean; data: PaginatedResponse<JustePrix> }>('/admin/games/juste-prix', params as any),
+
+    get: (id: number) =>
+      get<{ success: boolean; data: JustePrix }>(`/admin/games/juste-prix/${id}`),
+
+    create: (data: {
+      title: string;
+      starts_at: string;
+      ends_at: string;
+      prize_description?: string;
+      loyalty_points_prize?: number;
+      tolerance_percent?: number;
+    }) => post<{ success: boolean; data: JustePrix }>('/admin/games/juste-prix', data),
+
+    update: (id: number, data: Partial<JustePrix>) =>
+      put<{ success: boolean; message: string }>(`/admin/games/juste-prix/${id}`, data),
+
+    setStatus: (id: number, status: JustePrixStatus) =>
+      patch<{ success: boolean; message: string }>(`/admin/games/juste-prix/${id}/status`, { status }),
+
+    participations: (id: number, params?: { page?: number }) =>
+      get<{ success: boolean; data: PaginatedResponse<JustePrixParticipation> }>(
+        `/admin/games/juste-prix/${id}/participations`,
+        params as any
+      ),
+
+    awardWinner: (participationId: number) =>
+      post<{ success: boolean; message: string }>(
+        `/admin/games/juste-prix/participations/${participationId}/award`
+      ),
+  },
+
+  // ── Scheduler ────────────────────────────────────────────────────
+  scheduler: {
+    closeExpired: () =>
+      post<{ success: boolean; message: string }>('/admin/games/scheduler/close-expired'),
+    activateQuiz: () =>
+      post<{ success: boolean; message: string }>('/admin/games/scheduler/activate-quiz'),
+    activateBattle: () =>
+      post<{ success: boolean; message: string }>('/admin/games/scheduler/activate-battle'),
+  },
+};
+
 // ─── API Publique pour les Conseils ───────────────────────────────
 
 export const conseilApi = {
-  // Liste paginée des conseils (avec filtres)
   list: (params?: {
     category?: ConseilCategory;
     search?: string;
@@ -535,20 +1059,16 @@ export const conseilApi = {
     per_page?: number;
   }) => get<{ data: ConseilPaginatedResponse; featured?: Conseil[] }>('/conseils', params),
 
-  // Détail d’un conseil par slug
   get: (slug: string) => get<{ data: Conseil; related?: Conseil[] }>(`/conseils/${slug}`),
 
-  // Like / unlike
   like: (conseilId: number) => post<{ likes: number }>(`/conseils/${conseilId}/like`),
 
-  // Statistiques des catégories (pour les onglets)
   categoryStats: () => get<{ data: ConseilStatsResponse }>('/conseils/categories/stats'),
 };
 
 // ─── API Admin pour les Conseils ─────────────────────────────────
 
 export const adminConseilApi = {
-  // Liste avec filtres et pagination (inchangée)
   list: (params?: {
     search?: string;
     category?: ConseilCategory;
@@ -572,26 +1092,20 @@ export const adminConseilApi = {
       };
     }>('/admin/conseils', params),
 
-  // ✓ Création : envoi JSON (pas FormData)
   create: (data: any) => post<{ data: Conseil; message: string }>('/admin/conseils', data),
 
-  // Récupération par ID
   get: (id: number) => get<{ data: Conseil }>(`/admin/conseils/${id}`),
 
-  // ✓ Mise à jour : envoi JSON via PUT
   update: (id: number, data: any) => put<{ data: Conseil; message: string }>(`/admin/conseils/${id}`, data),
 
-  // Suppression
   delete: (id: number) => del<{ message: string }>(`/admin/conseils/${id}`),
 
-  // Actions rapides (inchangées)
   togglePublish: (id: number) =>
     patch<{ data: Conseil; message: string }>(`/admin/conseils/${id}/toggle-publish`, {}),
 
   toggleFeatured: (id: number) =>
     patch<{ data: Conseil; message: string }>(`/admin/conseils/${id}/toggle-featured`, {}),
 
-  // ✓ Upload média : seul endpoint multipart
   uploadMedia: (file: File, type: 'thumbnail' | 'gallery' = 'thumbnail') => {
     const fd = new FormData();
     fd.append('file', file);
@@ -599,10 +1113,10 @@ export const adminConseilApi = {
     return post<{ path: string; url: string }>('/admin/conseils/upload-media', fd, true);
   },
 
-  // Suppression média
   deleteMedia: (path: string) => del<{ message: string }>('/admin/conseils/delete-media', { path }),
 };
-// ─── APIS existantes (inchangées) ─────────────────────────────────────────
+
+// ─── APIS existantes ──────────────────────────────────────────────────────────
 
 export const categoryApi = {
   list: () => get<Category[]>('/categories'),
@@ -841,11 +1355,7 @@ export const selectiveSubscriptionApi = {
     ),
   addItem: (id: number, data: { product_id: number; quantity: number; is_active?: boolean }) =>
     post<{ success: boolean; message: string; item: any }>(`/selective-subscriptions/${id}/items`, data),
-  updateItem: (
-    id: number,
-    itemId: number,
-    data: { quantity?: number; is_active?: boolean }
-  ) =>
+  updateItem: (id: number, itemId: number, data: { quantity?: number; is_active?: boolean }) =>
     put<{
       success: boolean;
       message: string;
@@ -894,17 +1404,7 @@ export const adminSelectiveSubscriptionApi = {
       stats: SelectiveSubscriptionStats;
     }>('/admin/selective-subscriptions', params as any),
   show: (id: number) => get<{ success: boolean; data: SelectiveSubscription }>(`/admin/selective-subscriptions/${id}`),
-  update: (
-    id: number,
-    data: {
-      status?: string;
-      frequency?: string;
-      next_delivery_at?: string;
-      payment_method?: string;
-      discount_percent?: number;
-      notes?: string;
-    }
-  ) =>
+  update: (id: number, data: { status?: string; frequency?: string; next_delivery_at?: string; payment_method?: string; discount_percent?: number; notes?: string }) =>
     put<{ success: boolean; message: string; subscription: SelectiveSubscription }>(
       `/admin/selective-subscriptions/${id}`,
       data
@@ -935,6 +1435,7 @@ export const adminApi = {
   foodBoxes: foodBoxesApi,
   charity: adminCharityApi,
   selectiveSubscriptions: adminSelectiveSubscriptionApi,
+  games: adminGameApi,
   orders: {
     list: (params?: Record<string, any>) => get('/admin/orders', params),
     get: (id: number) => get(`/admin/orders/${id}`),
@@ -1027,6 +1528,7 @@ export const subscriptionApi = {
   resume: (id: number) => post(`/subscriptions/${id}/resume`),
   cancel: (id: number, reason?: string) => del(`/subscriptions/${id}`),
   history: (id: number, params?: any) => get(`/subscriptions/${id}/history`, params),
+  deleteSubscription: (id: number) => del(`/subscriptions/${id}/delete`),
 };
 
 export const adminSubscriptionApi = {
@@ -1049,24 +1551,129 @@ export const loyaltyApi = {
   leaderboard: () => get('/loyalty/leaderboard'),
 };
 
-export const gameApi = {
-  list: () => get('/games'),
-  get: (id: number) => get(`/games/${id}`),
-  winners: () => get('/games/winners'),
-  register: (id: number) => post(`/games/${id}/register`),
-  revealScratchCard: () => post('/games/scratch-card/reveal'),
-  spinWheel: (wheelNumber: number) => post('/games/wheel/spin', { wheel_number: wheelNumber }),
-  answerQuiz: (gameId: number, answers: any, timeTaken?: number) =>
-    post('/games/quiz/answer', { game_id: gameId, answers, time_taken: timeTaken }),
-  guessPrix: (gameId: number, productId: number, guessedPrice: number) =>
-    post('/games/juste-prix/guess', {
-      game_id: gameId,
-      product_id: productId,
-      guessed_price: guessedPrice,
-    }),
-  vote: (id: number, candidateId: number, battleType: string) =>
-    post(`/games/${id}/vote`, { candidate_id: candidateId, battle_type: battleType }),
-  myParticipations: () => get('/games/my-participations'),
+export const publicGameApi = {
+  myGames: () => get<{ success: boolean; data: any }>('/games/me'),
+  defis: {
+    list: (params?: { page?: number }) =>
+      get<{ success: boolean; data: PaginatedResponse<GameDefi> }>('/games/defis', params as any),
+    get: (id: number) => get<{ success: boolean; data: GameDefi }>(`/games/defis/${id}`),
+    getUserStatus: (id: number) =>
+      get<{ success: boolean; has_participated: boolean; has_voted: boolean; participation?: GameDefiParticipant }>(
+        `/games/defis/${id}/status`
+      ),
+    participate: (id: number, data: { submission_text?: string; submission_video_url?: string; submission_image?: File }) => {
+      const formData = new FormData();
+      if (data.submission_text) formData.append('submission_text', data.submission_text);
+      if (data.submission_video_url) formData.append('submission_video_url', data.submission_video_url);
+      if (data.submission_image) formData.append('submission_image', data.submission_image);
+      return post<{ success: boolean; message: string; data: GameDefiParticipant }>(
+        `/games/defis/${id}/participate`,
+        formData,
+        true
+      );
+    },
+    vote: (id: number, participant_id: number) =>
+      post<{ success: boolean; message: string }>(`/games/defis/${id}/vote`, { participant_id }),
+  },
+  scratch: {
+    list: () => get<{ success: boolean; data: ScratchCard[] }>('/games/scratch'),
+    reveal: (id: number) =>
+      post<{ success: boolean; message: string; prize_type: string; prize_label: string; prize_value: number }>(
+        `/games/scratch/${id}/scratch`
+      ),
+  },
+  wheel: {
+    available: () =>
+      get<{
+        success: boolean;
+        data: Array<{
+          id: number;
+          name: string;
+          wheel_type: string;
+          prizes: WheelPrize[];
+          spins_used: number;
+          spins_per_month: number;
+          can_spin: boolean;
+        }>;
+      }>('/games/wheel'),
+    spin: (configId: number) =>
+      post<{
+        success: boolean;
+        message: string;
+        prize: { type: string; label: string; value: number; color?: string };
+        spins_left: number;
+      }>(`/games/wheel/${configId}/spin`),
+    history: (params?: { page?: number }) =>
+      get<{ success: boolean; data: PaginatedResponse<WheelSpin> }>('/games/wheel/history', params as any),
+  },
+  quiz: {
+    list: () => get<{ success: boolean; data: QuizSession[] }>('/games/quiz'),
+    get: (id: number) =>
+      get<{
+        success: boolean;
+        data: QuizSession & {
+          questions: (QuizQuestion & { options?: Pick<QuizOption, 'id' | 'option_text' | 'order'>[] })[];
+          can_play: boolean;
+          next_play_at?: string;
+          participations_count: number;
+        };
+      }>(`/games/quiz/${id}`),
+    submit: (id: number, data: { answers: { question_id: number; option_id?: number; text?: string }[]; time_taken_seconds?: number }) =>
+      post<{
+        success: boolean;
+        score: number;
+        score_percent: number;
+        correct_count: number;
+        total: number;
+        won: boolean;
+        results: { question_id: number; is_correct: boolean; points: number; explanation?: string }[];
+        message: string;
+      }>(`/games/quiz/${id}/submit`, data),
+    leaderboard: (id: number) =>
+      get<{
+        success: boolean;
+        data: Array<{
+          rank: number;
+          user: Pick<User, 'id' | 'name' | 'avatar'>;
+          score_percent: number;
+          correct_answers: number;
+          time_taken?: number;
+          won: boolean;
+        }>;
+      }>(`/games/quiz/${id}/leaderboard`),
+  },
+  battle: {
+    list: (params?: { page?: number }) =>
+      get<{ success: boolean; data: PaginatedResponse<BattleContest> }>('/games/battle', params as any),
+    get: (id: number) =>
+      get<{
+        success: boolean;
+        data: BattleContest;
+        user_vote?: { candidate_id: number };
+        has_voted: boolean;
+      }>(`/games/battle/${id}`),
+    vote: (id: number, candidate_id: number) =>
+      post<{ success: boolean; message: string; candidate: BattleCandidate }>(`/games/battle/${id}/vote`, { candidate_id }),
+  },
+  justePrix: {
+    list: () => get<{ success: boolean; data: JustePrix[] }>('/games/justeprix'),
+    get: (id: number) =>
+      get<{
+        success: boolean;
+        data: JustePrix;
+        has_participated: boolean;
+        participation?: JustePrixParticipation;
+      }>(`/games/justeprix/${id}`),
+    participate: (id: number, data: { product_id: number; guessed_price: number }) =>
+      post<{
+        success: boolean;
+        won: boolean;
+        guessed_price: number;
+        real_price: number;
+        diff_percent: number;
+        message: string;
+      }>(`/games/justeprix/${id}/participate`, data),
+  },
 };
 
 export const charityApi = {
@@ -1123,8 +1730,6 @@ export const recipeApi = {
   get: (id: number) => get(`/recipes/${id}`),
 };
 
-// ─── Export principal ────────────────────────────────────────────────────────
-
 export default {
   authApi,
   profileApi,
@@ -1138,6 +1743,7 @@ export default {
   publicFoodBoxApi,
   adminApi,
   adminCharityApi,
+  adminGameApi,
   selectiveSubscriptionApi,
   adminSelectiveSubscriptionApi,
   cartApi,
@@ -1145,7 +1751,7 @@ export default {
   subscriptionApi,
   adminSubscriptionApi,
   loyaltyApi,
-  gameApi,
+  publicGameApi,
   charityApi,
   promotionApi,
   wishlistApi,
@@ -1154,6 +1760,6 @@ export default {
   delegateShoppingApi,
   advertisementApi,
   recipeApi,
-  conseilApi,          // public
-  adminConseilApi,     // admin
+  conseilApi,
+  adminConseilApi,
 };

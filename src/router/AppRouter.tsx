@@ -37,9 +37,18 @@ const AdminStats        = lazy(() => import('@/features/admin/AdminStats'))
 const AdminSubscriptions = lazy(() => import('@/features/admin/AdminSubscriptionsPage'))
 const AdminSelections   = lazy(() => import('@/features/admin/AdminSelectiveSubscriptionsPage'))
 const AdminCharity      = lazy(() => import('@/features/admin/AdminCharityManager'))
-
-// ── Admin Nos Conseils ─────────────────────────────────────────────
 const AdminConseils     = lazy(() => import('@/features/admin/AdminConseils'))
+
+// ── Admin Game Dashboard – pages exportées depuis AdminGameDashboard.tsx ──
+import {
+  GamesDashboardPage,
+  DefisPage,
+  ScratchPage,
+  WheelPage,
+  QuizPage,
+  BattlePage,
+  JustePrixPage,
+} from '@/features/admin/AdminGameDashboard'
 
 const NotFound          = lazy(() => import('@/features/NotFound'))
 
@@ -136,9 +145,18 @@ export function AppRouter() {
           <Route path="subscriptions" element={<AdminSubscriptions />} />
           <Route path="charity" element={<AdminCharity />} />
           <Route path="selections" element={<AdminSelections />} />
-
-          {/* ── Nos Conseils admin ── */}
           <Route path="conseils" element={<AdminConseils />} />
+
+          {/* ── Routes pour les jeux (sous-menu AdminLayout) ── */}
+          <Route path="games">
+            <Route index element={<GamesDashboardPage />} />
+            <Route path="defis" element={<DefisPage />} />
+            <Route path="scratch" element={<ScratchPage />} />
+            <Route path="wheel" element={<WheelPage />} />
+            <Route path="quiz" element={<QuizPage />} />
+            <Route path="battle" element={<BattlePage />} />
+            <Route path="justeprix" element={<JustePrixPage />} />
+          </Route>
         </Route>
       </Routes>
     </Suspense>

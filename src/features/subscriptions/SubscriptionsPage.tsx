@@ -25,6 +25,7 @@ import {
   Sliders,
   Layers,
   ToggleRight,
+  Trash2, // ← nouvelle icône
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -36,7 +37,7 @@ import { useToast, ToastContainer } from '@/hooks/useToast'
 import FoodBoxSubscriptionWizard from '@/features/subscriptions/FoodBoxSubscriptionWizard'
 
 // ============================================================
-// STYLES e-Sup'M
+// STYLES e-Sup'M (inchangé)
 // ============================================================
 const PAGE_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600;700&display=swap');
@@ -476,17 +477,23 @@ function SelectiveSubscriptionPromo() {
 }
 
 // ============================================================
-// SUBSCRIPTION ROW (mes abonnements)
+// SUBSCRIPTION ROW (mes abonnements) — AJOUT DU BOUTON SUPPRIMER
 // ============================================================
-function SubscriptionRow({ sub, onSuspend, onResume, suspending, resuming }: {
-  sub: any; onSuspend: (id: number) => void; onResume: (id: number) => void
-  suspending: boolean; resuming: boolean
+function SubscriptionRow({ sub, onSuspend, onResume, onDelete, suspending, resuming, deleting }: {
+  sub: any; onSuspend: (id: number) => void; onResume: (id: number) => void; onDelete: (id: number) => void
+  suspending: boolean; resuming: boolean; deleting: boolean
 }) {
   const sc   = STATUS_CONFIG[sub.status] ?? STATUS_CONFIG.pending
   const freq = FREQ_LABELS[sub.frequency]
   const itemCount = sub.items?.length ?? 0
   const isActive    = sub.status === 'active'
   const isSuspended = sub.status === 'suspended'
+
+  const handleDeleteClick = () => {
+    if (window.confirm(`Voulez-vous vraiment supprimer l'abonnement "${sub.name}" ? Cette action est définitive.`)) {
+      onDelete(sub.id)
+    }
+  }
 
   return (
     <motion.div
@@ -554,6 +561,14 @@ function SubscriptionRow({ sub, onSuspend, onResume, suspending, resuming }: {
                   <RefreshCw className="h-3 w-3" /> Réactiver
                 </button>
               )}
+              {/* Bouton Supprimer — toujours présent, le backend valide les contraintes */}
+              <button
+                onClick={handleDeleteClick}
+                disabled={deleting}
+                className="sub-font-body flex items-center gap-1 text-xs font-semibold px-3 py-2 rounded-xl transition-all hover:scale-105 disabled:opacity-50"
+                style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+                <Trash2 className="h-3 w-3" /> Supprimer
+              </button>
             </div>
           </div>
         </div>
@@ -623,6 +638,19 @@ export default function SubscriptionsPage() {
     mutationFn: (id: number) => subscriptionApi.resume(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['subscriptions'] }); toast({ type: 'success', message: 'Abonnement réactivé' }) },
     onError: () => toast({ type: 'error', message: 'Erreur lors de la réactivation' }),
+  })
+
+  // === MUTATION POUR LA SUPPRESSION ===
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => subscriptionApi.deleteSubscription(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
+      toast({ type: 'success', message: 'Abonnement supprimé définitivement' })
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Impossible de supprimer cet abonnement (peut-être des commandes associées).'
+      toast({ type: 'error', message })
+    },
   })
 
   const handleSubscriptionCreated = () => {
@@ -827,8 +855,10 @@ export default function SubscriptionsPage() {
                     sub={sub}
                     onSuspend={id => suspendMutation.mutate(id)}
                     onResume={id => resumeMutation.mutate(id)}
+                    onDelete={id => deleteMutation.mutate(id)}
                     suspending={suspendMutation.isPending}
                     resuming={resumeMutation.isPending}
+                    deleting={deleteMutation.isPending}
                   />
                 ))}
               </div>

@@ -1,3 +1,4 @@
+// features/charity/CharityPage.tsx
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -11,53 +12,45 @@ import { charityApi, productApi } from '@/api'
 import { useAuth } from '@/hooks/useAuth'
 import { formatCurrency } from '@/lib/utils'
 
-// ─────────────────────────────────────────────────────────────
-// STYLES
-// ─────────────────────────────────────────────────────────────
+// ── Palette e-Sup'M
+const C = {
+  orange: '#F5A623',
+  red: '#E02020',
+  dark: '#1C0F00',
+  warm: '#FFF8F0',
+  card: '#FFFDF9',
+  text: '#3D1F00',
+  muted: '#9E7554',
+  border: 'rgba(245,166,35,0.2)',
+  green: '#16A34A',
+}
+
+// ── Styles injectés
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
 
-  :root {
-    --ch-cream:   #faf7f2;
-    --ch-warm:    #f5efe6;
-    --ch-amber:   #e8820c;
-    --ch-earth:   #8b5e3c;
-    --ch-dark:    #1a1209;
-    --ch-green:   #16a34a;
-    --ch-teal:    #0d9488;
-  }
-
-  .ch-display { font-family: 'Playfair Display', Georgia, serif; }
-  .ch-body    { font-family: 'DM Sans', system-ui, sans-serif; }
-
-  .ch-card {
-    background: white;
-    border-radius: 20px;
-    border: 1.5px solid rgba(139,94,60,0.12);
-    overflow: hidden;
-  }
+  .ch-root * { font-family: 'Nunito', system-ui, sans-serif; }
 
   .ch-input {
-    font-family: 'DM Sans', system-ui, sans-serif;
     font-size: 14px;
-    color: var(--ch-dark);
-    background: var(--ch-warm);
-    border: 1.5px solid rgba(139,94,60,0.2);
+    font-weight: 600;
+    color: #1C0F00;
+    background: #FFF8F0;
+    border: 1.5px solid rgba(245,166,35,0.3);
     border-radius: 12px;
     padding: 10px 14px;
     width: 100%;
     outline: none;
     transition: border-color 0.15s, background 0.15s;
   }
-  .ch-input:focus { border-color: var(--ch-amber); background: white; }
-  .ch-input::placeholder { color: rgba(139,94,60,0.4); }
-  .ch-input.error { border-color: #dc2626; background: #fef2f2; }
+  .ch-input:focus { border-color: #F5A623; background: white; }
+  .ch-input::placeholder { color: rgba(158,117,84,0.5); font-weight: 500; }
+  .ch-input.error { border-color: #DC2626; background: #FEF2F2; }
 
   .ch-btn-primary {
-    font-family: 'DM Sans', system-ui, sans-serif;
-    font-weight: 700;
-    font-size: 14px;
-    background: var(--ch-amber);
+    font-weight: 800;
+    font-size: 15px;
+    background: linear-gradient(90deg, #E02020 0%, #F5A623 100%);
     color: white;
     border: none;
     border-radius: 14px;
@@ -68,45 +61,43 @@ const STYLES = `
     align-items: center;
     gap: 8px;
     justify-content: center;
+    box-shadow: 0 4px 16px rgba(224,32,32,0.25);
   }
-  .ch-btn-primary:hover:not(:disabled) { background: #c06a08; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(232,130,12,0.35); }
-  .ch-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+  .ch-btn-primary:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(224,32,32,0.3); }
+  .ch-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .ch-btn-outline {
-    font-family: 'DM Sans', system-ui, sans-serif;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 14px;
     background: white;
-    color: var(--ch-dark);
-    border: 1.5px solid rgba(139,94,60,0.25);
+    color: #3D1F00;
+    border: 1.5px solid rgba(245,166,35,0.4);
     border-radius: 14px;
-    padding: 13px 28px;
+    padding: 12px 24px;
     cursor: pointer;
     transition: all 0.2s;
   }
-  .ch-btn-outline:hover { border-color: var(--ch-amber); color: var(--ch-amber); }
+  .ch-btn-outline:hover { border-color: #F5A623; color: #E02020; }
 
-  .ch-amount-pill {
-    font-family: 'DM Sans', system-ui, sans-serif;
+  .ch-pill {
     font-weight: 700;
     font-size: 13px;
-    padding: 8px 16px;
+    padding: 8px 18px;
     border-radius: 50px;
-    border: 2px solid rgba(139,94,60,0.2);
+    border: 2px solid rgba(245,166,35,0.25);
     background: white;
-    color: var(--ch-earth);
+    color: #9E7554;
     cursor: pointer;
     transition: all 0.18s;
   }
-  .ch-amount-pill.active,
-  .ch-amount-pill:hover {
-    border-color: var(--ch-green);
-    background: #f0fdf4;
-    color: var(--ch-green);
+  .ch-pill.active, .ch-pill:hover {
+    border-color: #F5A623;
+    background: #FFF3E0;
+    color: #E02020;
   }
 
-  .ch-payment-card {
-    border: 2px solid rgba(139,94,60,0.15);
+  .ch-pay-card {
+    border: 1.5px solid rgba(245,166,35,0.2);
     border-radius: 14px;
     padding: 14px 16px;
     cursor: pointer;
@@ -116,46 +107,43 @@ const STYLES = `
     gap: 12px;
     background: white;
   }
-  .ch-payment-card.active { border-color: var(--ch-green); background: #f0fdf4; }
-  .ch-payment-card:hover  { border-color: var(--ch-green); }
+  .ch-pay-card.active { border-color: #F5A623; background: #FFF3E0; }
+  .ch-pay-card:hover { border-color: #F5A623; }
 
   .ch-tab {
-    font-family: 'DM Sans', system-ui, sans-serif;
-    font-weight: 700;
+    font-weight: 800;
     font-size: 14px;
-    padding: 12px 24px;
-    border-radius: 12px;
+    padding: 11px 20px;
+    border-radius: 10px;
     cursor: pointer;
     transition: all 0.2s;
     border: none;
     background: transparent;
-    color: rgba(139,94,60,0.6);
+    color: rgba(61,31,0,0.45);
+    display: flex;
+    align-items: center;
+    gap: 7px;
   }
   .ch-tab.active {
     background: white;
-    color: var(--ch-dark);
-    box-shadow: 0 2px 8px rgba(139,94,60,0.12);
+    color: #1C0F00;
+    box-shadow: 0 2px 10px rgba(245,166,35,0.2);
   }
 `
 
-// ─────────────────────────────────────────────────────────────
-// CONSTANTES
-// ─────────────────────────────────────────────────────────────
 const PRESET_AMOUNTS = [500, 1000, 2000, 5000, 10000]
 
 const PAYMENT_METHODS = [
-  { key: 'mobile_money', label: 'Mobile Money',     sub: 'MTN, Orange, Wave',  Icon: Smartphone },
-  { key: 'virement',     label: 'Virement bancaire', sub: 'Banque locale',       Icon: Building2  },
-  { key: 'card',         label: 'Carte bancaire',    sub: 'Visa, Mastercard',    Icon: CreditCard },
+  { key: 'mobile_money', label: 'Mobile Money',      sub: 'MTN, Orange, Wave', Icon: Smartphone },
+  { key: 'virement',     label: 'Virement bancaire',  sub: 'Banque locale',      Icon: Building2  },
+  { key: 'card',         label: 'Carte bancaire',     sub: 'Visa, Mastercard',   Icon: CreditCard },
 ]
 
-// ─────────────────────────────────────────────────────────────
-// COMPOSANTS UTILITAIRES
-// ─────────────────────────────────────────────────────────────
+// ── Utilitaires UI
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <p className="ch-body text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--ch-earth)', opacity: 0.7 }}>
-      {children}{required && <span style={{ color: '#dc2626' }}> *</span>}
+    <p style={{ color: C.muted, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+      {children}{required && <span style={{ color: '#DC2626' }}> *</span>}
     </p>
   )
 }
@@ -163,7 +151,7 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 function ErrorMsg({ msg }: { msg?: string }) {
   if (!msg) return null
   return (
-    <p className="ch-body flex items-center gap-1.5 text-xs font-semibold mt-1.5" style={{ color: '#dc2626' }}>
+    <p style={{ color: '#DC2626', fontSize: 12, fontWeight: 600, marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
       <AlertCircle size={12} /> {msg}
     </p>
   )
@@ -171,22 +159,25 @@ function ErrorMsg({ msg }: { msg?: string }) {
 
 function SuccessBanner({ title, sub, onReset }: { title: string; sub: string; onReset: () => void }) {
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center text-center py-10 px-6 gap-4">
-      <div className="w-16 h-16 rounded-full flex items-center justify-center"
-        style={{ background: '#dcfce7' }}>
-        <Check size={32} style={{ color: 'var(--ch-green)' }} />
+    <motion.div
+      initial={{ opacity: 0, scale: 0.94 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="flex flex-col items-center text-center py-12 px-6 gap-4"
+    >
+      <div
+        className="w-16 h-16 rounded-full flex items-center justify-center"
+        style={{ background: '#DCFCE7' }}
+      >
+        <Check size={30} style={{ color: C.green }} />
       </div>
-      <h3 className="ch-display font-black text-2xl" style={{ color: 'var(--ch-dark)' }}>{title}</h3>
-      <p className="ch-body text-sm max-w-sm" style={{ color: 'var(--ch-earth)', opacity: 0.75 }}>{sub}</p>
+      <h3 style={{ fontWeight: 900, fontSize: 22, color: C.dark }}>{title}</h3>
+      <p style={{ fontSize: 14, color: C.muted, maxWidth: 320 }}>{sub}</p>
       <button className="ch-btn-outline mt-2" onClick={onReset}>Faire un autre don</button>
     </motion.div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// SECTION — BON ALIMENTAIRE
-// ─────────────────────────────────────────────────────────────
+// ── Formulaire bon alimentaire
 function VoucherForm({ onSuccess }: { onSuccess: () => void }) {
   const [amount,    setAmount]    = useState<number | ''>('')
   const [customAmt, setCustomAmt] = useState('')
@@ -194,8 +185,7 @@ function VoucherForm({ onSuccess }: { onSuccess: () => void }) {
   const [errors,    setErrors]    = useState<Record<string, string>>({})
   const [done,      setDone]      = useState(false)
 
-  const finalAmount = amount !== '' ? amount : (customAmt ? Number(customAmt) : 0)
-
+  const finalAmount    = amount !== '' ? amount : (customAmt ? Number(customAmt) : 0)
   const pointsEarned   = finalAmount >= 500 ? Math.floor(finalAmount / 500) * 10 : 0
   const scratchUnlocked = finalAmount >= 5000
 
@@ -217,7 +207,7 @@ function VoucherForm({ onSuccess }: { onSuccess: () => void }) {
     return (
       <SuccessBanner
         title="Merci pour votre don !"
-        sub={`Votre bon alimentaire de ${formatCurrency(finalAmount)} a été créé. Vous gagnez ${pointsEarned} points fidélité.`}
+        sub={`Votre bon de ${formatCurrency(finalAmount)} a été créé. Vous gagnez ${pointsEarned} points fidélité.`}
         onReset={() => { setDone(false); setAmount(''); setCustomAmt(''); setPayment(''); }}
       />
     )
@@ -225,14 +215,17 @@ function VoucherForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <div className="space-y-6 p-6">
+
       {/* Montant */}
       <div>
         <FieldLabel required>Montant du bon</FieldLabel>
         <div className="flex flex-wrap gap-2 mb-3">
           {PRESET_AMOUNTS.map(a => (
-            <button key={a}
-              className={`ch-amount-pill ${amount === a ? 'active' : ''}`}
-              onClick={() => { setAmount(a); setCustomAmt(''); }}>
+            <button
+              key={a}
+              className={`ch-pill ${amount === a ? 'active' : ''}`}
+              onClick={() => { setAmount(a); setCustomAmt(''); }}
+            >
               {formatCurrency(a)}
             </button>
           ))}
@@ -248,29 +241,32 @@ function VoucherForm({ onSuccess }: { onSuccess: () => void }) {
         <ErrorMsg msg={errors.amount} />
       </div>
 
-      {/* Indicateur rewards */}
+      {/* Récompenses */}
       {finalAmount >= 500 && (
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
           className="rounded-2xl p-4 space-y-2.5"
-          style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+          style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}
+        >
           <div className="flex items-center gap-2">
-            <Star size={14} style={{ color: 'var(--ch-green)' }} />
-            <span className="ch-body text-sm font-bold" style={{ color: 'var(--ch-green)' }}>
+            <Star size={14} style={{ color: C.green }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.green }}>
               Vous gagnez {pointsEarned} points fidélité
             </span>
           </div>
           {scratchUnlocked && (
             <div className="flex items-center gap-2">
-              <Gift size={14} style={{ color: '#9333ea' }} />
-              <span className="ch-body text-sm font-bold" style={{ color: '#9333ea' }}>
+              <Gift size={14} style={{ color: '#9333EA' }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#9333EA' }}>
                 Carte à gratter débloquée !
               </span>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <Award size={14} style={{ color: '#0d9488' }} />
-            <span className="ch-body text-sm font-semibold" style={{ color: '#0d9488' }}>
-              Badge Bienfaiteur attribué
+            <Award size={14} style={{ color: C.orange }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.orange }}>
+              Badge Bienfaiteur e-Sup'M attribué
             </span>
           </div>
         </motion.div>
@@ -281,20 +277,26 @@ function VoucherForm({ onSuccess }: { onSuccess: () => void }) {
         <FieldLabel required>Mode de paiement</FieldLabel>
         <div className="space-y-2.5">
           {PAYMENT_METHODS.map(({ key, label, sub, Icon }) => (
-            <div key={key}
-              className={`ch-payment-card ${payment === key ? 'active' : ''}`}
-              onClick={() => setPayment(key)}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: payment === key ? '#dcfce7' : 'var(--ch-warm)' }}>
-                <Icon size={18} style={{ color: payment === key ? 'var(--ch-green)' : 'var(--ch-earth)' }} />
+            <div
+              key={key}
+              className={`ch-pay-card ${payment === key ? 'active' : ''}`}
+              onClick={() => setPayment(key)}
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: payment === key ? '#FFF3E0' : '#F5F5F5' }}
+              >
+                <Icon size={18} style={{ color: payment === key ? C.orange : C.muted }} />
               </div>
               <div className="flex-1">
-                <p className="ch-body text-sm font-bold" style={{ color: 'var(--ch-dark)' }}>{label}</p>
-                <p className="ch-body text-xs" style={{ color: 'var(--ch-earth)', opacity: 0.65 }}>{sub}</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>{label}</p>
+                <p style={{ fontSize: 12, color: C.muted }}>{sub}</p>
               </div>
               {payment === key && (
-                <div className="w-5 h-5 rounded-full flex items-center justify-center"
-                  style={{ background: 'var(--ch-green)' }}>
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center"
+                  style={{ background: C.orange }}
+                >
                   <Check size={11} className="text-white" />
                 </div>
               )}
@@ -305,26 +307,33 @@ function VoucherForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       {errors.api && (
-        <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
-          style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+        <div
+          className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
+          style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA' }}
+        >
           <AlertCircle size={15} /> {errors.api}
         </div>
       )}
 
-      <button className="ch-btn-primary w-full" disabled={mutation.isLoading} onClick={() => validate() && mutation.mutate()}>
-        {mutation.isLoading ? <><RefreshCw size={15} className="animate-spin" /> Traitement…</> : <>Offrir un bon de {finalAmount ? formatCurrency(finalAmount) : '—'} <ChevronRight size={15} /></>}
+      <button
+        className="ch-btn-primary w-full"
+        disabled={mutation.isLoading}
+        onClick={() => validate() && mutation.mutate()}
+      >
+        {mutation.isLoading
+          ? <><RefreshCw size={15} className="animate-spin" /> Traitement en cours...</>
+          : <>Offrir un bon de {finalAmount ? formatCurrency(finalAmount) : '—'} <ChevronRight size={15} /></>
+        }
       </button>
 
-      <p className="ch-body text-xs text-center" style={{ color: 'var(--ch-earth)', opacity: 0.5 }}>
+      <p style={{ fontSize: 11, color: C.muted, textAlign: 'center' }}>
         Paiement sécurisé · Le bon est envoyé immédiatement après confirmation
       </p>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// SECTION — DON DE PRODUITS
-// ─────────────────────────────────────────────────────────────
+// ── Formulaire don produit
 function ProductDonationForm({ onSuccess }: { onSuccess: () => void }) {
   const [query,    setQuery]    = useState('')
   const [selected, setSelected] = useState<{ id: number; name: string; price: number; quantity: number } | null>(null)
@@ -343,8 +352,8 @@ function ProductDonationForm({ onSuccess }: { onSuccess: () => void }) {
     onError: (e: any) => setErrors({ api: e.message || 'Erreur lors du traitement' }),
   })
 
-  const totalAmount = selected ? selected.price * selected.quantity : 0
-  const pointsEarned = totalAmount >= 500 ? Math.floor(totalAmount / 500) * 10 : 0
+  const totalAmount    = selected ? selected.price * selected.quantity : 0
+  const pointsEarned   = totalAmount >= 500 ? Math.floor(totalAmount / 500) * 10 : 0
   const scratchUnlocked = totalAmount >= 5000
 
   if (done) {
@@ -359,45 +368,53 @@ function ProductDonationForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <div className="space-y-6 p-6">
-      {/* Recherche produit */}
+
       <div>
         <FieldLabel required>Choisissez un produit à offrir</FieldLabel>
         <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--ch-earth)', opacity: 0.5 }} />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: C.muted }} />
           <input
             className="ch-input"
             style={{ paddingLeft: 36 }}
-            placeholder="Rechercher un produit du catalogue…"
+            placeholder="Rechercher dans le catalogue..."
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
-          {searching && <RefreshCw size={13} className="animate-spin absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--ch-earth)', opacity: 0.4 }} />}
+          {searching && (
+            <RefreshCw size={13} className="animate-spin absolute right-3 top-1/2 -translate-y-1/2" style={{ color: C.muted }} />
+          )}
         </div>
 
-        {/* Résultats */}
         <AnimatePresence>
           {results && results.length > 0 && !selected && (
-            <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="mt-2 rounded-2xl border overflow-hidden divide-y"
-              style={{ borderColor: 'rgba(139,94,60,0.12)', divideColor: 'rgba(139,94,60,0.08)' }}>
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mt-2 rounded-2xl overflow-hidden"
+              style={{ border: `1.5px solid ${C.border}` }}
+            >
               {results.slice(0, 6).map((prod: any) => (
-                <button key={prod.id}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-amber-50/60 transition-colors"
-                  onClick={() => { setSelected({ id: prod.id, name: prod.name, price: prod.price, quantity: 1 }); setQuery(''); }}>
+                <button
+                  key={prod.id}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors"
+                  style={{ borderBottom: `1px solid ${C.border}` }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#FFF3E0')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'white')}
+                  onClick={() => { setSelected({ id: prod.id, name: prod.name, price: prod.price, quantity: 1 }); setQuery('') }}
+                >
                   {prod.primary_image_url ? (
-                    <img src={prod.primary_image_url} alt={prod.name}
-                      className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
+                    <img src={prod.primary_image_url} alt={prod.name} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'var(--ch-warm)' }}>
-                      <Package size={16} style={{ color: 'var(--ch-earth)', opacity: 0.4 }} />
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#F5EDD8' }}>
+                      <Package size={16} style={{ color: C.muted }} />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="ch-body text-sm font-semibold truncate" style={{ color: 'var(--ch-dark)' }}>{prod.name}</p>
-                    <p className="ch-body text-xs" style={{ color: 'var(--ch-earth)', opacity: 0.65 }}>{formatCurrency(prod.price)}</p>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: C.dark }} className="truncate">{prod.name}</p>
+                    <p style={{ fontSize: 12, color: C.muted }}>{formatCurrency(prod.price)}</p>
                   </div>
-                  <ChevronRight size={14} style={{ color: 'var(--ch-earth)', opacity: 0.4 }} />
+                  <ChevronRight size={14} style={{ color: C.muted }} />
                 </button>
               ))}
             </motion.div>
@@ -407,67 +424,78 @@ function ProductDonationForm({ onSuccess }: { onSuccess: () => void }) {
 
       {/* Produit sélectionné */}
       {selected && (
-        <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
           className="rounded-2xl p-4 flex items-center gap-4"
-          style={{ background: 'var(--ch-warm)', border: '2px solid rgba(139,94,60,0.15)' }}>
+          style={{ background: '#FFF3E0', border: `1.5px solid ${C.border}` }}
+        >
           <div className="flex-1 min-w-0">
-            <p className="ch-body text-sm font-bold truncate" style={{ color: 'var(--ch-dark)' }}>{selected.name}</p>
-            <p className="ch-body text-xs" style={{ color: 'var(--ch-earth)', opacity: 0.65 }}>{formatCurrency(selected.price)} / unité</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: C.dark }} className="truncate">{selected.name}</p>
+            <p style={{ fontSize: 12, color: C.muted }}>{formatCurrency(selected.price)} / unité</p>
           </div>
 
-          {/* Contrôle quantité */}
-          <div className="flex items-center gap-2 rounded-xl border px-2 py-1"
-            style={{ background: 'white', borderColor: 'rgba(139,94,60,0.2)' }}>
-            <button onClick={() => setSelected(s => s ? { ...s, quantity: Math.max(1, s.quantity - 1) } : s)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-stone-100">
-              <Minus size={12} style={{ color: 'var(--ch-dark)' }} />
+          <div
+            className="flex items-center gap-2 rounded-xl px-2 py-1"
+            style={{ background: 'white', border: `1.5px solid ${C.border}` }}
+          >
+            <button
+              onClick={() => setSelected(s => s ? { ...s, quantity: Math.max(1, s.quantity - 1) } : s)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-orange-50 transition-colors"
+            >
+              <Minus size={12} style={{ color: C.dark }} />
             </button>
-            <span className="ch-body text-sm font-black w-5 text-center" style={{ color: 'var(--ch-dark)' }}>
+            <span style={{ fontSize: 14, fontWeight: 900, color: C.dark, minWidth: 20, textAlign: 'center' }}>
               {selected.quantity}
             </span>
-            <button onClick={() => setSelected(s => s ? { ...s, quantity: s.quantity + 1 } : s)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-stone-100">
-              <Plus size={12} style={{ color: 'var(--ch-dark)' }} />
+            <button
+              onClick={() => setSelected(s => s ? { ...s, quantity: s.quantity + 1 } : s)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-orange-50 transition-colors"
+            >
+              <Plus size={12} style={{ color: C.dark }} />
             </button>
           </div>
 
-          <button onClick={() => setSelected(null)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors">
-            <X size={14} style={{ color: '#dc2626' }} />
+          <button
+            onClick={() => setSelected(null)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors"
+          >
+            <X size={14} style={{ color: '#DC2626' }} />
           </button>
         </motion.div>
       )}
 
       {/* Résumé */}
       {selected && totalAmount > 0 && (
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
           className="rounded-2xl p-4 space-y-2"
-          style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+          style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}
+        >
           <div className="flex justify-between items-center">
-            <span className="ch-body text-sm font-semibold" style={{ color: 'var(--ch-earth)' }}>
-              Total du don
-            </span>
-            <span className="ch-display font-black text-lg" style={{ color: 'var(--ch-dark)' }}>
-              {formatCurrency(totalAmount)}
-            </span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: C.muted }}>Total du don</span>
+            <span style={{ fontSize: 20, fontWeight: 900, color: C.dark }}>{formatCurrency(totalAmount)}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Star size={13} style={{ color: 'var(--ch-green)' }} />
-            <span className="ch-body text-xs font-bold" style={{ color: 'var(--ch-green)' }}>
-              +{pointsEarned} points fidélité
-            </span>
+            <Star size={13} style={{ color: C.green }} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.green }}>+{pointsEarned} points fidélité</span>
             {scratchUnlocked && (
-              <><span style={{ color: 'rgba(139,94,60,0.3)', fontSize: 12 }}>·</span>
-              <Gift size={13} style={{ color: '#9333ea' }} />
-              <span className="ch-body text-xs font-bold" style={{ color: '#9333ea' }}>Carte à gratter</span></>
+              <>
+                <span style={{ color: C.muted, fontSize: 12 }}>·</span>
+                <Gift size={13} style={{ color: '#9333EA' }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#9333EA' }}>Carte à gratter</span>
+              </>
             )}
           </div>
         </motion.div>
       )}
 
       {errors.api && (
-        <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
-          style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+        <div
+          className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
+          style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA' }}
+        >
           <AlertCircle size={15} /> {errors.api}
         </div>
       )}
@@ -475,22 +503,22 @@ function ProductDonationForm({ onSuccess }: { onSuccess: () => void }) {
       <button
         className="ch-btn-primary w-full"
         disabled={!selected || mutation.isLoading}
-        onClick={() => mutation.mutate()}>
+        onClick={() => mutation.mutate()}
+      >
         {mutation.isLoading
-          ? <><RefreshCw size={15} className="animate-spin" /> Traitement…</>
-          : <>Confirmer le don <ChevronRight size={15} /></>}
+          ? <><RefreshCw size={15} className="animate-spin" /> Traitement...</>
+          : <>Confirmer le don <ChevronRight size={15} /></>
+        }
       </button>
 
-      <p className="ch-body text-xs text-center" style={{ color: 'var(--ch-earth)', opacity: 0.5 }}>
-        Votre don de produit sera traité dans les 24h
+      <p style={{ fontSize: 11, color: C.muted, textAlign: 'center' }}>
+        Votre don de produit sera traité dans les 24h ouvrées
       </p>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// SECTION — MON IMPACT
-// ─────────────────────────────────────────────────────────────
+// ── Section impact
 function ImpactSection({ userId }: { userId?: number }) {
   const { data, isLoading } = useQuery({
     queryKey: ['charity-impact'],
@@ -498,35 +526,36 @@ function ImpactSection({ userId }: { userId?: number }) {
     enabled: !!userId,
   })
 
-  if (!userId || isLoading) return null
-  if (!data || data.total_donated === 0) return null
+  if (!userId || isLoading || !data || data.total_donated === 0) return null
 
   const stats = [
-    { label: 'Dons totaux',       value: formatCurrency(data.total_donated), Icon: TrendingUp },
-    { label: 'Dons effectués',    value: data.donations_count,               Icon: Heart      },
-    { label: 'Produits offerts',  value: data.products_gifted,               Icon: Package    },
+    { label: 'Dons totaux',      value: formatCurrency(data.total_donated), Icon: TrendingUp },
+    { label: 'Dons effectués',   value: data.donations_count,               Icon: Heart      },
+    { label: 'Produits offerts', value: data.products_gifted,               Icon: Package    },
   ]
 
   return (
-    <div className="ch-card p-6">
-      <h3 className="ch-display font-black text-xl mb-4" style={{ color: 'var(--ch-dark)' }}>
-        Votre impact
-      </h3>
+    <div
+      className="rounded-2xl p-6"
+      style={{ background: C.card, border: `1.5px solid ${C.border}`, boxShadow: '0 2px 12px rgba(245,166,35,0.08)' }}
+    >
+      <h3 style={{ fontWeight: 900, fontSize: 20, color: C.dark, marginBottom: 16 }}>Votre impact</h3>
       <div className="grid grid-cols-3 gap-3">
         {stats.map(({ label, value, Icon }) => (
-          <div key={label} className="text-center rounded-2xl p-4"
-            style={{ background: 'var(--ch-warm)' }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2"
-              style={{ background: 'rgba(22,163,74,0.12)' }}>
-              <Icon size={18} style={{ color: 'var(--ch-green)' }} />
+          <div key={label} className="text-center rounded-2xl p-4" style={{ background: '#FFF3E0' }}>
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2"
+              style={{ background: 'rgba(245,166,35,0.15)' }}
+            >
+              <Icon size={18} style={{ color: C.orange }} />
             </div>
-            <p className="ch-display font-black text-lg" style={{ color: 'var(--ch-dark)' }}>{value}</p>
-            <p className="ch-body text-xs font-semibold" style={{ color: 'var(--ch-earth)', opacity: 0.65 }}>{label}</p>
+            <p style={{ fontWeight: 900, fontSize: 18, color: C.dark }}>{value}</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>{label}</p>
           </div>
         ))}
       </div>
       {data.message && (
-        <p className="ch-body text-sm text-center mt-4 font-medium" style={{ color: 'var(--ch-green)' }}>
+        <p style={{ fontSize: 13, textAlign: 'center', marginTop: 16, fontWeight: 600, color: C.green }}>
           {data.message}
         </p>
       )}
@@ -534,80 +563,98 @@ function ImpactSection({ userId }: { userId?: number }) {
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAGE PRINCIPALE
-// ─────────────────────────────────────────────────────────────
+// ── Page principale
 export default function CharityPage() {
   const navigate  = useNavigate()
   const { user }  = useAuth()
   const [tab, setTab] = useState<'voucher' | 'product'>('voucher')
 
   const benefits = [
-    { Icon: Star,   label: '10 points',       sub: 'par 500 FCFA donnés'    },
-    { Icon: Gift,   label: 'Carte à gratter', sub: 'dès 5 000 FCFA de don'  },
-    { Icon: Award,  label: 'Badge social',     sub: 'Bienfaiteur e-Sup\'M'  },
-    { Icon: Users,  label: 'Impact réel',      sub: 'Familles bénéficiaires' },
+    { Icon: Star,   label: '10 points',        sub: 'par 500 FCFA donnés'   },
+    { Icon: Gift,   label: 'Carte à gratter',  sub: 'dès 5 000 FCFA de don' },
+    { Icon: Award,  label: 'Badge Bienfaiteur', sub: "Reconnu e-Sup'M"       },
+    { Icon: Users,  label: 'Impact réel',       sub: 'Familles bénéficiaires' },
   ]
 
-  const handleRequireAuth = () => {
-    if (!user) { navigate('/login?redirect=/charity'); return false }
-    return true
-  }
-
   return (
-    <div className="ch-body" style={{ background: 'var(--ch-cream)', minHeight: '100vh', paddingBottom: 60 }}>
+    <div className="ch-root min-h-screen" style={{ background: C.warm, paddingBottom: 60 }}>
       <style dangerouslySetInnerHTML={{ __html: STYLES }} />
 
+      {/* ── Bande de couleur en haut ── */}
+      <div style={{ height: 4, background: `linear-gradient(90deg, ${C.red} 0%, ${C.orange} 100%)` }} />
+
       {/* ── Hero ── */}
-      <div style={{ background: 'linear-gradient(145deg, #064e3b 0%, #059669 55%, #34d399 100%)', padding: '56px 16px 48px' }}>
-        <div className="container-app max-w-2xl text-center">
-          <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 mb-5"
-            style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
+      <div style={{ background: `linear-gradient(140deg, #1C0F00 0%, #B91C1C 40%, #F5A623 100%)`, padding: '56px 16px 48px' }}>
+        <div className="max-w-2xl mx-auto text-center">
+
+          {/* Badge section */}
+          <div
+            className="inline-flex items-center gap-2 rounded-full px-4 py-2 mb-5"
+            style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}
+          >
             <Heart size={14} className="text-white" />
-            <span className="ch-body text-xs font-bold uppercase tracking-widest text-white">Charity Panier</span>
+            <span style={{ color: 'white', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Charity Panier
+            </span>
           </div>
-          <h1 className="ch-display font-black text-white" style={{ fontSize: 'clamp(26px, 5vw, 40px)', lineHeight: 1.15 }}>
+
+          <h1 style={{ fontWeight: 900, color: 'white', fontSize: 'clamp(26px, 5vw, 40px)', lineHeight: 1.15, marginBottom: 12 }}>
             Faites le bien<br />en faisant vos courses
           </h1>
-          <p className="ch-body text-white/80 text-sm mt-4 max-w-lg mx-auto leading-relaxed">
+          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 15, lineHeight: 1.7, maxWidth: 420, margin: '0 auto' }}>
             Offrez des bons alimentaires ou des produits à des familles dans le besoin.
-            Chaque don génère des points fidélité et peut débloquer des récompenses.
+            Chaque don génère des points fidélité et peut déclencher des récompenses.
           </p>
 
           {/* Avantages */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-8">
             {benefits.map(({ Icon, label, sub }) => (
-              <div key={label} className="rounded-2xl p-3 text-center"
-                style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}>
+              <div
+                key={label}
+                className="rounded-2xl p-3 text-center"
+                style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)' }}
+              >
                 <Icon size={20} className="text-white mx-auto mb-1.5" />
-                <p className="ch-body text-xs font-bold text-white">{label}</p>
-                <p className="ch-body text-[10px] text-white/65 mt-0.5">{sub}</p>
+                <p style={{ fontSize: 12, fontWeight: 800, color: 'white' }}>{label}</p>
+                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>{sub}</p>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="container-app max-w-2xl py-8 space-y-6">
+      {/* ── Contenu ── */}
+      <div className="max-w-2xl mx-auto py-8 px-4 space-y-6">
 
-        {/* Impact utilisateur */}
+        {/* Impact */}
         <ImpactSection userId={user?.id} />
 
-        {/* Formulaire principal */}
-        <div className="ch-card">
+        {/* Formulaire */}
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{
+            background: C.card,
+            border: `1.5px solid ${C.border}`,
+            boxShadow: '0 4px 24px rgba(245,166,35,0.1)',
+          }}
+        >
           {/* Onglets */}
-          <div className="flex gap-1 p-2" style={{ background: 'var(--ch-warm)', margin: '0 0 0 0' }}>
-            <button className={`ch-tab flex-1 flex items-center justify-center gap-2 ${tab === 'voucher' ? 'active' : ''}`}
-              onClick={() => setTab('voucher')}>
+          <div className="flex gap-1 p-2" style={{ background: '#FFF3E0' }}>
+            <button
+              className={`ch-tab flex-1 ${tab === 'voucher' ? 'active' : ''}`}
+              onClick={() => setTab('voucher')}
+            >
               <Ticket size={14} /> Bon alimentaire
             </button>
-            <button className={`ch-tab flex-1 flex items-center justify-center gap-2 ${tab === 'product' ? 'active' : ''}`}
-              onClick={() => setTab('product')}>
+            <button
+              className={`ch-tab flex-1 ${tab === 'product' ? 'active' : ''}`}
+              onClick={() => setTab('product')}
+            >
               <ShoppingBag size={14} /> Don de produit
             </button>
           </div>
 
-          {/* Contenu des onglets */}
+          {/* Contenu onglet */}
           <AnimatePresence mode="wait">
             {user ? (
               tab === 'voucher' ? (
@@ -620,17 +667,22 @@ export default function CharityPage() {
                 </motion.div>
               )
             ) : (
-              /* Non connecté */
-              <motion.div key="guest" className="flex flex-col items-center text-center py-12 px-6 gap-4"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div className="w-16 h-16 rounded-full flex items-center justify-center"
-                  style={{ background: 'var(--ch-warm)' }}>
-                  <Heart size={28} style={{ color: 'var(--ch-green)' }} />
+              <motion.div
+                key="guest"
+                className="flex flex-col items-center text-center py-12 px-6 gap-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center"
+                  style={{ background: '#FFF3E0' }}
+                >
+                  <Heart size={28} style={{ color: C.red }} />
                 </div>
-                <h3 className="ch-display font-black text-xl" style={{ color: 'var(--ch-dark)' }}>
+                <h3 style={{ fontWeight: 900, fontSize: 20, color: C.dark }}>
                   Connectez-vous pour donner
                 </h3>
-                <p className="ch-body text-sm max-w-xs" style={{ color: 'var(--ch-earth)', opacity: 0.75 }}>
+                <p style={{ fontSize: 14, color: C.muted, maxWidth: 280 }}>
                   Un compte est nécessaire pour recevoir vos points fidélité et votre carte à gratter.
                 </p>
                 <div className="flex gap-3 mt-2">
@@ -647,14 +699,17 @@ export default function CharityPage() {
         </div>
 
         {/* Note d'information */}
-        <div className="rounded-2xl px-5 py-4 flex items-start gap-3"
-          style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-          <Leaf size={16} style={{ color: '#92400e', marginTop: 2, flexShrink: 0 }} />
-          <p className="ch-body text-xs leading-relaxed" style={{ color: '#92400e' }}>
+        <div
+          className="rounded-2xl px-5 py-4 flex items-start gap-3"
+          style={{ background: '#FFFBEB', border: '1px solid rgba(245,166,35,0.4)' }}
+        >
+          <Leaf size={16} style={{ color: C.orange, marginTop: 2, flexShrink: 0 }} />
+          <p style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>
             Les bons alimentaires sont distribués directement aux familles bénéficiaires identifiées par notre équipe.
-            Votre don est traité sous 24h. Pour tout renseignement, contactez-nous via WhatsApp.
+            Votre don est traité sous 24h. Pour toute question, contactez-nous via WhatsApp.
           </p>
         </div>
+
       </div>
     </div>
   )
